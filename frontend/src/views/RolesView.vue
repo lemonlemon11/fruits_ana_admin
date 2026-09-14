@@ -207,12 +207,13 @@ onMounted(async () => {
       <div class="empty-state" v-if="!roles.length">暂无角色</div>
     </div>
 
-    <div v-if="showModal" class="modal-mask">
-      <div class="modal">
-        <div class="modal-header">
-          <div class="modal-title">{{ editingId === null ? '新增角色' : '编辑角色' }}</div>
+    <div v-if="showModal" class="drawer-mask" @click.self="showModal = false">
+      <div class="drawer" role="dialog" aria-modal="true" aria-label="角色编辑">
+        <div class="drawer-header">
+          <div class="drawer-title">{{ editingId === null ? '新增角色' : '编辑角色' }}</div>
           <button class="link-button" @click="showModal = false">关闭</button>
         </div>
+        <div class="drawer-body">
         <div class="field">
           <label>角色编码</label>
           <input v-model="form.code" class="input" :disabled="editingId !== null" />
@@ -229,45 +230,48 @@ onMounted(async () => {
           <input id="role-active" v-model="form.is_active" type="checkbox" />
           <label for="role-active">启用角色</label>
         </div>
-        <div class="modal-actions">
+        </div>
+        <div class="drawer-actions">
           <button class="secondary-button" @click="showModal = false">取消</button>
           <button class="primary-button" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存' }}</button>
         </div>
       </div>
     </div>
 
-    <div v-if="showGrantModal && grantRole" class="modal-mask">
-      <div class="modal">
-        <div class="modal-header">
-          <div class="modal-title">分配角色权限：{{ grantRole.name }}</div>
+    <div v-if="showGrantModal && grantRole" class="drawer-mask" @click.self="showGrantModal = false">
+      <div class="drawer" role="dialog" aria-modal="true" aria-label="分配角色权限">
+        <div class="drawer-header">
+          <div class="drawer-title">分配角色权限：{{ grantRole.name }}</div>
           <button class="link-button" @click="showGrantModal = false">关闭</button>
         </div>
-        <div class="grant-layout">
-          <section class="grant-section">
-            <h3>菜单</h3>
-            <label v-for="menu in flatMenus" :key="menu.id" class="checkbox-row grant-menu-row" :style="{ paddingLeft: `${menu.depth * 18}px` }">
-              <input v-model="selectedMenuIds" type="checkbox" :value="menu.id" />
-              {{ menu.name }}
-            </label>
-          </section>
-          <section class="grant-section">
-            <h3>权限点</h3>
-            <div v-for="group in permissionGroups" :key="group.module" class="grant-group">
-              <div class="grant-group-head">
-                <strong>{{ group.module }}</strong>
-                <button class="text-button" @click="togglePermissionGroup(group.module, true)">全选</button>
-                <button class="text-button" @click="togglePermissionGroup(group.module, false)">清空</button>
+        <div class="drawer-body">
+          <div class="grant-layout">
+            <section class="grant-section">
+              <h3>菜单</h3>
+              <label v-for="menu in flatMenus" :key="menu.id" class="checkbox-row grant-menu-row" :style="{ paddingLeft: `${menu.depth * 18}px` }">
+                <input v-model="selectedMenuIds" type="checkbox" :value="menu.id" />
+                {{ menu.name }}
+              </label>
+            </section>
+            <section class="grant-section">
+              <h3>权限点</h3>
+              <div v-for="group in permissionGroups" :key="group.module" class="grant-group">
+                <div class="grant-group-head">
+                  <strong>{{ group.module }}</strong>
+                  <button class="text-button" @click="togglePermissionGroup(group.module, true)">全选</button>
+                  <button class="text-button" @click="togglePermissionGroup(group.module, false)">清空</button>
+                </div>
+                <div class="grant-group-body">
+                  <label v-for="permission in group.items" :key="permission.id" class="checkbox-row">
+                    <input v-model="selectedPermissionIds" type="checkbox" :value="permission.id" />
+                    <span><code>{{ permission.code }}</code> · {{ permission.name }}</span>
+                  </label>
+                </div>
               </div>
-              <div class="grant-group-body">
-                <label v-for="permission in group.items" :key="permission.id" class="checkbox-row">
-                  <input v-model="selectedPermissionIds" type="checkbox" :value="permission.id" />
-                  <span><code>{{ permission.code }}</code> · {{ permission.name }}</span>
-                </label>
-              </div>
-            </div>
-          </section>
+            </section>
+          </div>
         </div>
-        <div class="modal-actions">
+        <div class="drawer-actions">
           <button class="secondary-button" @click="showGrantModal = false">取消</button>
           <button class="primary-button" :disabled="saving" @click="saveGrant">{{ saving ? '保存中...' : '保存授权' }}</button>
         </div>

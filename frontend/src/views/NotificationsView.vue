@@ -273,74 +273,76 @@ onMounted(async () => {
       />
     </div>
 
-    <div v-if="showModal" class="modal-mask">
-      <div class="modal notification-modal">
-        <div class="modal-header">
-          <div class="modal-title">{{ editingId === null ? '新建通知' : '编辑通知' }}</div>
+    <div v-if="showModal" class="drawer-mask" @click.self="showModal = false">
+      <div class="drawer notification-drawer" role="dialog" aria-modal="true" aria-label="通知编辑">
+        <div class="drawer-header">
+          <div class="drawer-title">{{ editingId === null ? '新建通知' : '编辑通知' }}</div>
           <button class="link-button" @click="showModal = false">关闭</button>
         </div>
-        <div class="field">
-          <label>标题</label>
-          <input v-model="form.title" class="input" maxlength="160" />
-        </div>
-        <div class="field">
-          <label>内容</label>
-          <RichTextEditor v-model="form.content" />
-        </div>
-        <div class="field-grid">
+        <div class="drawer-body">
           <div class="field">
-            <label>类型</label>
-            <select v-model="form.notification_type" class="select">
-              <option value="announcement">公告</option>
-              <option value="task">任务</option>
-              <option value="system">系统</option>
+            <label>标题</label>
+            <input v-model="form.title" class="input" maxlength="160" />
+          </div>
+          <div class="field">
+            <label>内容</label>
+            <RichTextEditor v-model="form.content" />
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label>类型</label>
+              <select v-model="form.notification_type" class="select">
+                <option value="announcement">公告</option>
+                <option value="task">任务</option>
+                <option value="system">系统</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>优先级</label>
+              <select v-model="form.priority" class="select">
+                <option value="normal">普通</option>
+                <option value="important">重要</option>
+                <option value="urgent">紧急</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>发送范围</label>
+            <select v-model="form.target_type" class="select">
+              <option value="all">全部用户</option>
+              <option value="role">指定角色</option>
+              <option value="user">指定用户</option>
             </select>
           </div>
-          <div class="field">
-            <label>优先级</label>
-            <select v-model="form.priority" class="select">
-              <option value="normal">普通</option>
-              <option value="important">重要</option>
-              <option value="urgent">紧急</option>
+          <div v-if="form.target_type === 'role'" class="field">
+            <label>接收角色</label>
+            <label v-for="role in roles" :key="role.id" class="checkbox-row">
+              <input v-model="form.target_role_ids" type="checkbox" :value="role.id" />
+              {{ role.name }}
+            </label>
+          </div>
+          <div v-if="form.target_type === 'user'" class="field">
+            <label>接收用户</label>
+            <select v-model="form.target_user_ids" class="select" multiple>
+              <option v-for="user in users" :key="user.id" :value="user.id">{{ user.display_name }}</option>
             </select>
           </div>
-        </div>
-        <div class="field">
-          <label>发送范围</label>
-          <select v-model="form.target_type" class="select">
-            <option value="all">全部用户</option>
-            <option value="role">指定角色</option>
-            <option value="user">指定用户</option>
-          </select>
-        </div>
-        <div v-if="form.target_type === 'role'" class="field">
-          <label>接收角色</label>
-          <label v-for="role in roles" :key="role.id" class="checkbox-row">
-            <input v-model="form.target_role_ids" type="checkbox" :value="role.id" />
-            {{ role.name }}
-          </label>
-        </div>
-        <div v-if="form.target_type === 'user'" class="field">
-          <label>接收用户</label>
-          <select v-model="form.target_user_ids" class="select" multiple>
-            <option v-for="user in users" :key="user.id" :value="user.id">{{ user.display_name }}</option>
-          </select>
-        </div>
-        <div class="field checkbox-row">
-          <input id="notification-published" v-model="form.is_published" type="checkbox" />
-          <label for="notification-published">创建后立即发布</label>
-        </div>
-        <div class="field-grid">
-          <div class="field">
-            <label>定时发布时间</label>
-            <input v-model="form.publish_at" class="input" type="datetime-local" />
+          <div class="field checkbox-row">
+            <input id="notification-published" v-model="form.is_published" type="checkbox" />
+            <label for="notification-published">创建后立即发布</label>
           </div>
-          <div class="field">
-            <label>失效时间</label>
-            <input v-model="form.expire_at" class="input" type="datetime-local" />
+          <div class="field-grid">
+            <div class="field">
+              <label>定时发布时间</label>
+              <input v-model="form.publish_at" class="input" type="datetime-local" />
+            </div>
+            <div class="field">
+              <label>失效时间</label>
+              <input v-model="form.expire_at" class="input" type="datetime-local" />
+            </div>
           </div>
         </div>
-        <div class="modal-actions">
+        <div class="drawer-actions">
           <button class="secondary-button" @click="showModal = false">取消</button>
           <button class="primary-button" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存' }}</button>
         </div>

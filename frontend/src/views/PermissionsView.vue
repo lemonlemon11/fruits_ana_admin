@@ -167,12 +167,13 @@ onMounted(load)
       <div class="empty-state" v-if="!items.length">暂无权限点</div>
     </div>
 
-    <div v-if="showModal" class="modal-mask">
-      <div class="modal">
-        <div class="modal-header">
-          <div class="modal-title">{{ editingId === null ? '新增权限点' : '编辑权限点' }}</div>
+    <div v-if="showModal" class="drawer-mask" @click.self="showModal = false">
+      <div class="drawer" role="dialog" aria-modal="true" aria-label="权限点编辑">
+        <div class="drawer-header">
+          <div class="drawer-title">{{ editingId === null ? '新增权限点' : '编辑权限点' }}</div>
           <button class="link-button" @click="showModal = false">关闭</button>
         </div>
+        <div class="drawer-body">
         <div class="field">
           <label>权限编码</label>
           <input v-model="form.code" class="input" :disabled="editingId !== null" placeholder="import:upload" />
@@ -202,7 +203,8 @@ onMounted(load)
           <input id="permission-active" v-model="form.is_active" type="checkbox" />
           <label for="permission-active">启用权限点</label>
         </div>
-        <div class="modal-actions">
+        </div>
+        <div class="drawer-actions">
           <button class="secondary-button" @click="showModal = false">取消</button>
           <button class="primary-button" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存' }}</button>
         </div>

@@ -254,12 +254,13 @@ onMounted(async () => {
       />
     </div>
 
-    <div v-if="showModal" class="modal-mask">
-      <div class="modal">
-        <div class="modal-header">
-          <div class="modal-title">{{ editingId === null ? '新增用户' : '编辑用户' }}</div>
+    <div v-if="showModal" class="drawer-mask" @click.self="showModal = false">
+      <div class="drawer" role="dialog" aria-modal="true" aria-label="用户编辑">
+        <div class="drawer-header">
+          <div class="drawer-title">{{ editingId === null ? '新增用户' : '编辑用户' }}</div>
           <button class="link-button" @click="showModal = false">关闭</button>
         </div>
+        <div class="drawer-body">
         <div class="field">
           <label>用户名</label>
           <input v-model="form.display_name" class="input" />
@@ -279,7 +280,8 @@ onMounted(async () => {
             {{ role.name }}
           </label>
         </div>
-        <div class="modal-actions">
+        </div>
+        <div class="drawer-actions">
           <button class="secondary-button" @click="showModal = false">取消</button>
           <button class="primary-button" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存' }}</button>
         </div>

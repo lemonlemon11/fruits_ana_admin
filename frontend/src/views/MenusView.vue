@@ -145,12 +145,13 @@ onMounted(load)
       <div v-if="!tree.length" class="empty-state">暂无菜单，请先新增目录或菜单</div>
     </div>
 
-    <div v-if="showModal" class="modal-mask">
-      <div class="modal">
-        <div class="modal-header">
-          <div class="modal-title">{{ editingId === null ? '新增菜单' : '编辑菜单' }}</div>
+    <div v-if="showModal" class="drawer-mask" @click.self="showModal = false">
+      <div class="drawer" role="dialog" aria-modal="true" aria-label="菜单编辑">
+        <div class="drawer-header">
+          <div class="drawer-title">{{ editingId === null ? '新增菜单' : '编辑菜单' }}</div>
           <button class="link-button" @click="showModal = false">关闭</button>
         </div>
+        <div class="drawer-body">
         <div class="field">
           <label>父级菜单</label>
           <select v-model="form.parent_id" class="select">
@@ -196,7 +197,8 @@ onMounted(load)
           <input id="menu-active" v-model="form.is_active" type="checkbox" />
           <label for="menu-active">启用菜单</label>
         </div>
-        <div class="modal-actions">
+        </div>
+        <div class="drawer-actions">
           <button class="secondary-button" @click="showModal = false">取消</button>
           <button class="primary-button" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存' }}</button>
         </div>
