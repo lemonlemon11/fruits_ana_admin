@@ -24,6 +24,7 @@ const route = useRoute()
 const clockNow = ref(new Date())
 const sidebarCollapsed = ref(false)
 const showBackToTop = ref(false)
+const backToTopThreshold = 240
 let clockTimer: number | undefined
 
 const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
@@ -65,11 +66,14 @@ onMounted(() => {
     clockNow.value = new Date()
   }, 1000)
   window.addEventListener('scroll', handleScroll, { passive: true })
+  document.addEventListener('scroll', handleScroll, { passive: true, capture: true })
+  handleScroll()
 })
 
 onBeforeUnmount(() => {
   if (clockTimer !== undefined) window.clearInterval(clockTimer)
   window.removeEventListener('scroll', handleScroll)
+  document.removeEventListener('scroll', handleScroll, { capture: true })
 })
 
 watch(
@@ -107,8 +111,13 @@ function toggleSidebar() {
   sidebarCollapsed.value = !sidebarCollapsed.value
 }
 
-function handleScroll() {
-  showBackToTop.value = window.scrollY > 480
+function readScrollTop(target?: EventTarget | null) {
+  if (target instanceof HTMLElement && target.scrollTop > 0) return target.scrollTop
+  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop
+}
+
+function handleScroll(event?: Event) {
+  showBackToTop.value = readScrollTop(event?.target) > backToTopThreshold
 }
 
 function scrollToTop() {

@@ -9,7 +9,7 @@ const items = ref<UserItem[]>([])
 const total = ref(0)
 const roles = ref<RoleItem[]>([])
 const page = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(8)
 const keyword = ref('')
 const roleFilter = ref<number | ''>('')
 const activeFilter = ref<'' | 'true' | 'false'>('')
@@ -186,7 +186,6 @@ onMounted(async () => {
     <div class="page-header">
       <div class="page-heading">
         <h1>用户管理</h1>
-        <p class="page-description">管理登录账号、状态与角色分配</p>
       </div>
       <div class="page-actions">
         <button v-if="hasPermission('admin:user:create')" class="primary-button" @click="openCreate">新增用户</button>
@@ -209,7 +208,7 @@ onMounted(async () => {
 
     <p v-if="error" class="error">{{ error }}</p>
 
-    <div class="table-wrap">
+    <div class="table-wrap fixed-height-list">
     <table class="table">
       <thead>
         <tr>
@@ -304,4 +303,16 @@ onMounted(async () => {
 
 <style scoped>
 .danger-text { color: var(--danger); }
+.fixed-height-list {
+  height: 31rem;
+  min-height: 31rem;
+  overflow-y: hidden;
+}
+.fixed-height-list .table { min-width: 720px; }
+@media (max-width: 820px) {
+  .fixed-height-list {
+    height: auto;
+    min-height: 24rem;
+  }
+}
 </style>
