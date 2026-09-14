@@ -111,10 +111,6 @@ onMounted(load)
 <template>
   <section class="page-stack">
     <div class="page-header">
-      <div class="page-heading">
-        <h1>权限管理</h1>
-        <p class="page-description">维护权限点，为角色授权提供依据</p>
-      </div>
       <div class="page-actions">
         <button v-if="hasPermission('admin:permission:create')" class="primary-button" @click="openCreate">新增权限点</button>
       </div>

@@ -129,10 +129,6 @@ onMounted(load)
 <template>
   <section class="page-stack">
     <div class="page-header">
-      <div class="page-heading">
-        <h1>菜单管理</h1>
-        <p class="page-description">管理目录、菜单与按钮结构</p>
-      </div>
       <div class="page-actions">
         <button v-if="hasPermission('admin:menu:create')" class="primary-button" @click="openCreate">新增菜单</button>
       </div>

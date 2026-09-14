@@ -197,10 +197,6 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <div class="page-header">
-      <div class="page-heading">
-        <h1>通知管理</h1>
-        <p class="page-description">向 fruits_ana 用户发布公告、任务和系统提醒</p>
-      </div>
       <div class="page-actions">
         <button v-if="hasPermission('admin:notification:create')" class="primary-button" @click="openCreate">新建通知</button>
       </div>

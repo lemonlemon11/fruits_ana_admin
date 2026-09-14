@@ -159,10 +159,6 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <div class="page-header">
-      <div class="page-heading">
-        <h1>角色管理</h1>
-        <p class="page-description">维护角色并分配菜单与权限</p>
-      </div>
       <div class="page-actions">
         <button v-if="hasPermission('admin:role:create')" class="primary-button" @click="openCreate">新增角色</button>
       </div>

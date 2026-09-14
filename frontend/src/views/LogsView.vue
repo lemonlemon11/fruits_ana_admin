@@ -62,13 +62,6 @@ onMounted(loadOperations)
 
 <template>
   <section class="page-stack">
-    <div class="page-header">
-      <div class="page-heading">
-        <h1>审计日志</h1>
-        <p class="page-description">追溯登录行为与关键操作记录</p>
-      </div>
-    </div>
-
     <div class="tabs">
       <button :class="{ active: tab === 'operation' }" @click="changeTab('operation')">操作日志</button>
       <button :class="{ active: tab === 'login' }" @click="changeTab('login')">登录日志</button>

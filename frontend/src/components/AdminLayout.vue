@@ -11,9 +11,12 @@ import LayoutDashboard from '@lucide/vue/dist/esm/icons/layout-dashboard.mjs'
 import LogOut from '@lucide/vue/dist/esm/icons/log-out.mjs'
 import PanelLeftClose from '@lucide/vue/dist/esm/icons/panel-left-close.mjs'
 import PanelLeftOpen from '@lucide/vue/dist/esm/icons/panel-left-open.mjs'
+import PanelRightClose from '@lucide/vue/dist/esm/icons/panel-right-close.mjs'
+import RefreshCw from '@lucide/vue/dist/esm/icons/refresh-cw.mjs'
 import ScrollText from '@lucide/vue/dist/esm/icons/scroll-text.mjs'
 import Settings from '@lucide/vue/dist/esm/icons/settings.mjs'
 import ShieldCheck from '@lucide/vue/dist/esm/icons/shield-check.mjs'
+import SquareX from '@lucide/vue/dist/esm/icons/square-x.mjs'
 import Users from '@lucide/vue/dist/esm/icons/users.mjs'
 import X from '@lucide/vue/dist/esm/icons/x.mjs'
 import { currentUser, logout } from '../auth'
@@ -24,6 +27,8 @@ const route = useRoute()
 const clockNow = ref(new Date())
 const sidebarCollapsed = ref(false)
 const showBackToTop = ref(false)
+const viewKey = ref(0)
+const contextMenu = ref<{ x: number; y: number; path: string } | null>(null)
 const backToTopThreshold = 240
 let clockTimer: number | undefined
 
@@ -60,6 +65,14 @@ const headerClock = computed(() => {
     datetime: `${calendarDate}T${time}`,
   }
 })
+const contextMenuStyle = computed(() => {
+  if (!contextMenu.value) return {}
+  const menuWidth = 168
+  const menuHeight = 180
+  const left = Math.min(Math.max(8, contextMenu.value.x), window.innerWidth - menuWidth - 12)
+  const top = Math.min(Math.max(8, contextMenu.value.y), window.innerHeight - menuHeight - 12)
+  return { left: `${left}px`, top: `${top}px` }
+})
 
 onMounted(() => {
   clockTimer = window.setInterval(() => {
@@ -67,6 +80,8 @@ onMounted(() => {
   }, 1000)
   window.addEventListener('scroll', handleScroll, { passive: true })
   document.addEventListener('scroll', handleScroll, { passive: true, capture: true })
+  document.addEventListener('click', closeContextMenu)
+  document.addEventListener('keydown', handleGlobalKeydown)
   handleScroll()
 })
 
@@ -74,6 +89,8 @@ onBeforeUnmount(() => {
   if (clockTimer !== undefined) window.clearInterval(clockTimer)
   window.removeEventListener('scroll', handleScroll)
   document.removeEventListener('scroll', handleScroll, { capture: true })
+  document.removeEventListener('click', closeContextMenu)
+  document.removeEventListener('keydown', handleGlobalKeydown)
 })
 
 watch(
@@ -92,6 +109,7 @@ function openTab(path: string) {
 }
 
 function closeTab(path: string) {
+  closeContextMenu()
   if (path === pinnedTab.path) return
   const index = openTabs.value.findIndex((tab) => tab.path === path)
   if (index < 0) return
@@ -101,6 +119,29 @@ function closeTab(path: string) {
     const nextPath = openTabs.value[Math.max(0, index - 1)]?.path || pinnedTab.path
     router.push(nextPath)
   }
+}
+
+function closeOtherTabs(path: string) {
+  openTabs.value = openTabs.value.filter((tab) => tab.path === pinnedTab.path || tab.path === path)
+  if (route.path !== path) void router.push(path)
+  closeContextMenu()
+}
+
+function closeAllTabs() {
+  openTabs.value = [{ ...pinnedTab }]
+  if (route.path !== pinnedTab.path) void router.push(pinnedTab.path)
+  closeContextMenu()
+}
+
+function refreshTab(path: string) {
+  if (route.path !== path) {
+    void router.push(path).then(() => {
+      viewKey.value += 1
+    })
+  } else {
+    viewKey.value += 1
+  }
+  closeContextMenu()
 }
 
 function tabIcon(path: string) {
@@ -118,6 +159,18 @@ function readScrollTop(target?: EventTarget | null) {
 
 function handleScroll(event?: Event) {
   showBackToTop.value = readScrollTop(event?.target) > backToTopThreshold
+}
+
+function openTabContextMenu(event: MouseEvent, path: string) {
+  contextMenu.value = { x: event.clientX, y: event.clientY, path }
+}
+
+function closeContextMenu() {
+  contextMenu.value = null
+}
+
+function handleGlobalKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeContextMenu()
 }
 
 function scrollToTop() {
@@ -187,6 +240,7 @@ async function handleLogout() {
             :key="tab.path"
             class="workspace-tab"
             :class="{ 'is-active': route.path === tab.path }"
+            @contextmenu.prevent="openTabContextMenu($event, tab.path)"
           >
             <button type="button" class="workspace-tab-open" @click="openTab(tab.path)">
               <component :is="tabIcon(tab.path)" :size="16" aria-hidden="true" />
@@ -204,8 +258,33 @@ async function handleLogout() {
           </span>
         </div>
         <main>
-          <RouterView />
+          <RouterView :key="viewKey" />
         </main>
+        <div
+          v-if="contextMenu"
+          class="tab-context-menu"
+          :style="contextMenuStyle"
+          role="menu"
+          @click.stop
+          @contextmenu.prevent
+        >
+          <button type="button" role="menuitem" @click="refreshTab(contextMenu.path)">
+            <RefreshCw :size="15" :stroke-width="2" aria-hidden="true" />
+            刷新当前
+          </button>
+          <button type="button" role="menuitem" :disabled="contextMenu.path === pinnedTab.path" @click="closeTab(contextMenu.path)">
+            <X :size="15" :stroke-width="2" aria-hidden="true" />
+            关闭当前
+          </button>
+          <button type="button" role="menuitem" @click="closeOtherTabs(contextMenu.path)">
+            <PanelRightClose :size="15" :stroke-width="2" aria-hidden="true" />
+            关闭其他
+          </button>
+          <button type="button" role="menuitem" class="danger-text" @click="closeAllTabs">
+            <SquareX :size="15" :stroke-width="2" aria-hidden="true" />
+            关闭全部
+          </button>
+        </div>
         <button v-show="showBackToTop" class="back-to-top" type="button" aria-label="回到顶部" @click="scrollToTop">
           <ArrowUp :size="18" :stroke-width="2" aria-hidden="true" />
           顶部

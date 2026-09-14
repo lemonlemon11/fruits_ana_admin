@@ -82,10 +82,6 @@ onMounted(load)
 <template>
   <section class="page-stack dashboard-page">
     <div class="page-header">
-      <div class="page-heading">
-        <h1>工作台</h1>
-        <p class="page-description">系统运行概况、业务数据健康度与最近管理动态</p>
-      </div>
       <div class="page-header-actions">
         <button class="secondary-button" @click="load">刷新数据</button>
       </div>

@@ -184,9 +184,6 @@ onMounted(async () => {
 <template>
   <section class="page-stack">
     <div class="page-header">
-      <div class="page-heading">
-        <h1>用户管理</h1>
-      </div>
       <div class="page-actions">
         <button v-if="hasPermission('admin:user:create')" class="primary-button" @click="openCreate">新增用户</button>
       </div>

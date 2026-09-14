@@ -47,13 +47,6 @@ onMounted(load)
 
 <template>
   <section class="page-stack">
-    <div class="page-header">
-      <div class="page-heading">
-        <h1>系统配置</h1>
-        <p class="page-description">管理登录、会话与安全策略</p>
-      </div>
-    </div>
-
     <p v-if="error" class="error">{{ error }}</p>
 
     <div class="card table-wrap">

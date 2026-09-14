@@ -85,13 +85,6 @@ onMounted(loadImports)
 
 <template>
   <section class="page-stack">
-    <div class="page-header">
-      <div class="page-heading">
-        <h1>业务数据</h1>
-        <p class="page-description">查看导入批次、数据问题与 AI 缓存</p>
-      </div>
-    </div>
-
     <div class="tabs">
       <button :class="{ active: tab === 'imports' }" @click="changeTab('imports')">导入批次</button>
       <button :class="{ active: tab === 'issues' }" :disabled="!selectedBatch" @click="changeTab('issues')">数据问题</button>
