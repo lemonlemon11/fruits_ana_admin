@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { del, get, patch, post } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import { useEscapeClose } from '../composables/useEscapeClose'
 import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
 import Send from '@lucide/vue/dist/esm/icons/send.mjs'
 import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
@@ -38,6 +39,10 @@ const form = reactive({
   is_published: false,
   publish_at: '',
   expire_at: '',
+})
+
+useEscapeClose(() => showModal.value, () => {
+  showModal.value = false
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))

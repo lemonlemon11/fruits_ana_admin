@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { del, get, patch, post } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import { useEscapeClose } from '../composables/useEscapeClose'
 import KeyRound from '@lucide/vue/dist/esm/icons/key-round.mjs'
 import LogOut from '@lucide/vue/dist/esm/icons/log-out.mjs'
 import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
@@ -30,6 +31,13 @@ const passwordTarget = ref<UserItem | null>(null)
 const newPassword = ref('')
 const saving = ref(false)
 const busyUserId = ref<number | null>(null)
+
+useEscapeClose(() => showPasswordModal.value, () => {
+  showPasswordModal.value = false
+})
+useEscapeClose(() => !showPasswordModal.value && showModal.value, () => {
+  showModal.value = false
+})
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 

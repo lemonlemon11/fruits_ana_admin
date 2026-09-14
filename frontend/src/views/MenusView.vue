@@ -4,6 +4,7 @@ import MenuTreeNode from '../components/MenuTreeNode.vue'
 import { del, get, patch, post } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import { useEscapeClose } from '../composables/useEscapeClose'
 import type { MenuNode } from '../types'
 
 type FlatMenu = MenuNode & { depth: number }
@@ -34,6 +35,10 @@ const form = reactive({
   permission_code: '',
   sort_order: 0,
   is_active: true,
+})
+
+useEscapeClose(() => showModal.value, () => {
+  showModal.value = false
 })
 
 async function load() {

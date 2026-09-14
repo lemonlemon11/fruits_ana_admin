@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { confirmState, settleConfirm } from '../feedback'
+import { useEscapeClose } from '../composables/useEscapeClose'
+
+useEscapeClose(() => confirmState.open, () => settleConfirm(false))
 </script>
 
 <template>

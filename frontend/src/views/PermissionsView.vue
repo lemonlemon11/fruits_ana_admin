@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { del, get, patch, post } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import { useEscapeClose } from '../composables/useEscapeClose'
 import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
 import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
 import type { ListResponse, PermissionItem } from '../types'
@@ -22,6 +23,10 @@ const form = reactive({
   permission_type: 'action' as 'menu' | 'action' | 'api' | 'data',
   description: '',
   is_active: true,
+})
+
+useEscapeClose(() => showModal.value, () => {
+  showModal.value = false
 })
 
 async function load() {

@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { del, get, patch, post, put } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import { useEscapeClose } from '../composables/useEscapeClose'
 import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
 import ShieldCheck from '@lucide/vue/dist/esm/icons/shield-check.mjs'
 import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
@@ -21,6 +22,13 @@ const selectedMenuIds = ref<number[]>([])
 const selectedPermissionIds = ref<number[]>([])
 const saving = ref(false)
 const busyRoleId = ref<number | null>(null)
+
+useEscapeClose(() => showGrantModal.value, () => {
+  showGrantModal.value = false
+})
+useEscapeClose(() => !showGrantModal.value && showModal.value, () => {
+  showModal.value = false
+})
 
 async function load() {
   error.value = ''
