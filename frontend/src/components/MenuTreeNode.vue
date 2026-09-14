@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
+import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
 import { hasPermission } from '../auth'
 import type { MenuNode } from '../types'
 
@@ -42,8 +44,8 @@ const typeLabel: Record<MenuNode['menu_type'], string> = {
       </span>
       <span class="tag" :class="props.node.is_active ? 'success' : 'danger'">{{ props.node.is_active ? '启用' : '停用' }}</span>
       <div class="menu-tree-actions">
-        <button v-if="hasPermission('admin:menu:update')" class="link-button" @click="emit('edit', props.node)">编辑</button>
-        <button v-if="hasPermission('admin:menu:delete')" class="link-button danger-text" @click="emit('remove', props.node)">删除</button>
+        <button v-if="hasPermission('admin:menu:update')" class="table-action" @click="emit('edit', props.node)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
+        <button v-if="hasPermission('admin:menu:delete')" class="table-action danger" @click="emit('remove', props.node)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
       </div>
     </div>
 

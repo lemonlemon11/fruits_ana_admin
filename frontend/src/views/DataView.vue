@@ -3,6 +3,8 @@ import { onMounted, ref } from 'vue'
 import { del, get } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import Eye from '@lucide/vue/dist/esm/icons/eye.mjs'
+import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { AiCacheItem, DataIssueItem, ImportBatchItem, ListResponse } from '../types'
 
@@ -93,20 +95,21 @@ onMounted(loadImports)
     </div>
 
     <div v-if="tab === 'imports'">
-      <div class="toolbar">
-        <input v-model="keyword" class="input" style="max-width: 220px" placeholder="商号、单号或文件名" @keyup.enter="page = 1; loadImports()" />
-        <select v-model="status" class="select" style="max-width: 160px" @change="page = 1; loadImports()">
-          <option value="">全部状态</option>
-          <option value="success">成功</option>
-          <option value="conflict">冲突</option>
-          <option value="pending">待处理</option>
-          <option value="failed">失败</option>
-        </select>
-        <button class="secondary-button" @click="page = 1; loadImports()">查询</button>
-      </div>
-      <p v-if="error" class="error">{{ error }}</p>
-      <div class="table-wrap">
-      <table class="table">
+      <div class="list-card">
+        <div class="toolbar">
+          <input v-model="keyword" class="input" style="max-width: 220px" placeholder="商号、单号或文件名" @keyup.enter="page = 1; loadImports()" />
+          <select v-model="status" class="select" style="max-width: 160px" @change="page = 1; loadImports()">
+            <option value="">全部状态</option>
+            <option value="success">成功</option>
+            <option value="conflict">冲突</option>
+            <option value="pending">待处理</option>
+            <option value="failed">失败</option>
+          </select>
+          <button class="secondary-button" @click="page = 1; loadImports()">查询</button>
+        </div>
+        <p v-if="error" class="error">{{ error }}</p>
+        <div class="table-wrap">
+        <table class="table">
         <thead>
           <tr>
             <th>ID</th>
@@ -130,19 +133,20 @@ onMounted(loadImports)
             <td>{{ item.imported_at ? new Date(item.imported_at).toLocaleString() : '—' }}</td>
             <td><span class="tag" :class="item.status">{{ item.status }}</span></td>
             <td>{{ item.success_count }} / {{ item.warning_count }} / {{ item.failure_count }}</td>
-            <td><button class="link-button" @click="showIssues(item)">查看问题</button></td>
+            <td><button class="table-action" @click="showIssues(item)"><Eye :size="15" :stroke-width="2" aria-hidden="true" />查看问题</button></td>
           </tr>
         </tbody>
       </table>
+        </div>
+        <div class="empty-state" v-if="!loading && !imports.length">暂无导入批次</div>
+        <PaginationBar
+          v-model:page="page"
+          v-model:page-size="pageSize"
+          :total="importTotal"
+          :page-size-options="[10, 20, 50, 100]"
+          @change="loadImports"
+        />
       </div>
-      <div class="empty-state" v-if="!loading && !imports.length">暂无导入批次</div>
-      <PaginationBar
-        v-model:page="page"
-        v-model:page-size="pageSize"
-        :total="importTotal"
-        :page-size-options="[10, 20, 50, 100]"
-        @change="loadImports"
-      />
     </div>
 
     <div v-if="tab === 'issues'">
@@ -200,7 +204,7 @@ onMounted(loadImports)
             <td>{{ item.created_at ? new Date(item.created_at).toLocaleString() : '—' }}</td>
             <td style="max-width: 360px">{{ item.content }}</td>
             <td>
-              <button v-if="hasPermission('admin:data:refresh-cache')" class="link-button danger-text" :disabled="busyId === item.id" @click="deleteAi(item)">删除</button>
+              <button v-if="hasPermission('admin:data:refresh-cache')" class="table-action danger" :disabled="busyId === item.id" @click="deleteAi(item)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
             </td>
           </tr>
         </tbody>

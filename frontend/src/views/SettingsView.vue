@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { get, patch } from '../api/client'
 import { notify } from '../feedback'
 import { hasPermission } from '../auth'
+import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
 
 type SettingItem = { key: string; value: string | null; description: string | null }
 
@@ -68,7 +69,7 @@ onMounted(load)
             </td>
             <td>{{ item.description || '—' }}</td>
             <td v-if="hasPermission('admin:config:update')">
-              <button v-if="editingKey !== item.key" class="link-button" @click="openEdit(item)">编辑</button>
+              <button v-if="editingKey !== item.key" class="table-action" @click="openEdit(item)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
               <template v-else>
                 <button class="primary-button" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存' }}</button>
                 <button class="secondary-button" :disabled="saving" @click="editingKey = null">取消</button>

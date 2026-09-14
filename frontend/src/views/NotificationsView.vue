@@ -3,6 +3,9 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { del, get, patch, post } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
+import Send from '@lucide/vue/dist/esm/icons/send.mjs'
+import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
 import RichTextEditor from '../components/RichTextEditor.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import { notificationPlainText, sanitizeNotificationHtml } from '../notificationHtml'
@@ -197,28 +200,29 @@ onMounted(async () => {
 
 <template>
   <section class="page-stack">
-    <div class="toolbar">
-      <input v-model="keyword" class="input" style="max-width: 220px" placeholder="标题/内容" @keyup.enter="page = 1; load()" />
-      <select v-model="typeFilter" class="select" style="max-width: 130px" @change="page = 1; load()">
-        <option value="">全部类型</option>
-        <option value="announcement">公告</option>
-        <option value="task">任务</option>
-        <option value="system">系统</option>
-      </select>
-      <select v-model="priorityFilter" class="select" style="max-width: 130px" @change="page = 1; load()">
-        <option value="">全部优先级</option>
-        <option value="normal">普通</option>
-        <option value="important">重要</option>
-        <option value="urgent">紧急</option>
-      </select>
-      <select v-model="statusFilter" class="select" style="max-width: 130px" @change="page = 1; load()">
-        <option value="">全部状态</option>
-        <option value="true">已发布</option>
-        <option value="false">草稿</option>
-      </select>
-      <button class="secondary-button" @click="page = 1; load()">查询</button>
-      <button v-if="hasPermission('admin:notification:create')" class="primary-button toolbar-action" @click="openCreate">新建通知</button>
-    </div>
+    <div class="list-card">
+      <div class="toolbar">
+        <input v-model="keyword" class="input" style="max-width: 220px" placeholder="标题/内容" @keyup.enter="page = 1; load()" />
+        <select v-model="typeFilter" class="select" style="max-width: 130px" @change="page = 1; load()">
+          <option value="">全部类型</option>
+          <option value="announcement">公告</option>
+          <option value="task">任务</option>
+          <option value="system">系统</option>
+        </select>
+        <select v-model="priorityFilter" class="select" style="max-width: 130px" @change="page = 1; load()">
+          <option value="">全部优先级</option>
+          <option value="normal">普通</option>
+          <option value="important">重要</option>
+          <option value="urgent">紧急</option>
+        </select>
+        <select v-model="statusFilter" class="select" style="max-width: 130px" @change="page = 1; load()">
+          <option value="">全部状态</option>
+          <option value="true">已发布</option>
+          <option value="false">草稿</option>
+        </select>
+        <button class="secondary-button" @click="page = 1; load()">查询</button>
+        <button v-if="hasPermission('admin:notification:create')" class="primary-button toolbar-action" @click="openCreate">新建通知</button>
+      </div>
 
     <p v-if="error" class="error">{{ error }}</p>
 
@@ -248,9 +252,11 @@ onMounted(async () => {
             <td><span class="tag" :class="item.is_published ? 'success' : ''">{{ item.is_published ? '已发布' : '草稿' }}</span></td>
             <td>{{ item.publish_at ? new Date(item.publish_at).toLocaleString() : '—' }}</td>
             <td>
-              <button v-if="!item.is_published && hasPermission('admin:notification:publish')" class="link-button" :disabled="busyId === item.id" @click="publish(item)">发布</button>
-              <button v-if="hasPermission('admin:notification:update')" class="link-button" :disabled="busyId === item.id" @click="openEdit(item)">编辑</button>
-              <button v-if="hasPermission('admin:notification:delete')" class="link-button danger-text" :disabled="busyId === item.id" @click="removeItem(item)">删除</button>
+              <div class="table-actions">
+                <button v-if="!item.is_published && hasPermission('admin:notification:publish')" class="table-action" :disabled="busyId === item.id" @click="publish(item)"><Send :size="15" :stroke-width="2" aria-hidden="true" />发布</button>
+                <button v-if="hasPermission('admin:notification:update')" class="table-action" :disabled="busyId === item.id" @click="openEdit(item)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
+                <button v-if="hasPermission('admin:notification:delete')" class="table-action danger" :disabled="busyId === item.id" @click="removeItem(item)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -258,13 +264,14 @@ onMounted(async () => {
     </div>
     <div v-if="!loading && !items.length" class="empty-state">暂无通知</div>
 
-    <PaginationBar
-      v-model:page="page"
-      v-model:page-size="pageSize"
-      :total="total"
-      :page-size-options="[10, 20, 50, 100]"
-      @change="load"
-    />
+      <PaginationBar
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-size-options="[10, 20, 50, 100]"
+        @change="load"
+      />
+    </div>
 
     <div v-if="showModal" class="modal-mask">
       <div class="modal notification-modal">

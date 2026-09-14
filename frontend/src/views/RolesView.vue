@@ -3,6 +3,9 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { del, get, patch, post, put } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
+import ShieldCheck from '@lucide/vue/dist/esm/icons/shield-check.mjs'
+import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
 import type { ListResponse, MenuItem, PermissionItem, RoleItem } from '../types'
 
 const roles = ref<RoleItem[]>([])
@@ -158,11 +161,12 @@ onMounted(async () => {
 
 <template>
   <section class="page-stack">
-    <div class="toolbar">
-      <span class="toolbar-summary">共 {{ roles.length }} 个角色</span>
-      <button v-if="hasPermission('admin:role:create')" class="primary-button toolbar-action" @click="openCreate">新增角色</button>
-    </div>
-    <p v-if="error" class="error">{{ error }}</p>
+    <div class="list-card">
+      <div class="toolbar">
+        <span class="toolbar-summary">共 {{ roles.length }} 个角色</span>
+        <button v-if="hasPermission('admin:role:create')" class="primary-button toolbar-action" @click="openCreate">新增角色</button>
+      </div>
+      <p v-if="error" class="error">{{ error }}</p>
 
     <div class="table-wrap">
     <table class="table">
@@ -190,15 +194,18 @@ onMounted(async () => {
           <td>{{ role.permission_ids.length }}</td>
           <td>{{ role.description || '—' }}</td>
           <td>
-            <button v-if="hasPermission('admin:role:update')" class="link-button" :disabled="busyRoleId === role.id" @click="openEdit(role)">编辑</button>
-            <button v-if="hasPermission('admin:role:grant')" class="link-button" :disabled="role.code === 'super_admin' || role.code === 'fruit_admin' || busyRoleId === role.id" @click="openGrant(role)">授权</button>
-            <button v-if="hasPermission('admin:role:delete') && !role.is_system" class="link-button danger-text" :disabled="busyRoleId === role.id" @click="removeRole(role)">删除</button>
+            <div class="table-actions">
+              <button v-if="hasPermission('admin:role:update')" class="table-action" :disabled="busyRoleId === role.id" @click="openEdit(role)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
+              <button v-if="hasPermission('admin:role:grant')" class="table-action" :disabled="role.code === 'super_admin' || role.code === 'fruit_admin' || busyRoleId === role.id" @click="openGrant(role)"><ShieldCheck :size="15" :stroke-width="2" aria-hidden="true" />授权</button>
+              <button v-if="hasPermission('admin:role:delete') && !role.is_system" class="table-action danger" :disabled="busyRoleId === role.id" @click="removeRole(role)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
+            </div>
           </td>
         </tr>
       </tbody>
     </table>
     </div>
-    <div class="empty-state" v-if="!roles.length">暂无角色</div>
+      <div class="empty-state" v-if="!roles.length">暂无角色</div>
+    </div>
 
     <div v-if="showModal" class="modal-mask">
       <div class="modal">

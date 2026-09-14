@@ -3,6 +3,11 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { del, get, patch, post } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import KeyRound from '@lucide/vue/dist/esm/icons/key-round.mjs'
+import LogOut from '@lucide/vue/dist/esm/icons/log-out.mjs'
+import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
+import Power from '@lucide/vue/dist/esm/icons/power.mjs'
+import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { ListResponse, RoleItem, UserItem } from '../types'
 
@@ -184,20 +189,21 @@ onMounted(async () => {
 
 <template>
   <section class="page-stack">
-    <div class="toolbar">
-      <input v-model="keyword" class="input" style="max-width: 220px" placeholder="搜索用户名" @keyup.enter="page = 1; load()" />
-      <select v-model="roleFilter" class="select" style="max-width: 180px" @change="page = 1; load()">
-        <option value="">全部角色</option>
-        <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
-      </select>
-      <select v-model="activeFilter" class="select" style="max-width: 140px" @change="page = 1; load()">
-        <option value="">全部状态</option>
-        <option value="true">启用</option>
-        <option value="false">禁用</option>
-      </select>
-      <button class="secondary-button" @click="page = 1; load()">查询</button>
-      <button v-if="hasPermission('admin:user:create')" class="primary-button toolbar-action" @click="openCreate">新增用户</button>
-    </div>
+    <div class="list-card">
+      <div class="toolbar">
+        <input v-model="keyword" class="input" style="max-width: 220px" placeholder="搜索用户名" @keyup.enter="page = 1; load()" />
+        <select v-model="roleFilter" class="select" style="max-width: 180px" @change="page = 1; load()">
+          <option value="">全部角色</option>
+          <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
+        </select>
+        <select v-model="activeFilter" class="select" style="max-width: 140px" @change="page = 1; load()">
+          <option value="">全部状态</option>
+          <option value="true">启用</option>
+          <option value="false">禁用</option>
+        </select>
+        <button class="secondary-button" @click="page = 1; load()">查询</button>
+        <button v-if="hasPermission('admin:user:create')" class="primary-button toolbar-action" @click="openCreate">新增用户</button>
+      </div>
 
     <p v-if="error" class="error">{{ error }}</p>
 
@@ -225,11 +231,13 @@ onMounted(async () => {
           <td>{{ user.last_login_at ? new Date(user.last_login_at).toLocaleString() : '—' }}</td>
           <td>{{ new Date(user.created_at).toLocaleString() }}</td>
           <td>
-            <button v-if="hasPermission('admin:user:update')" class="link-button" :disabled="busyUserId === user.id" @click="openEdit(user)">编辑</button>
-            <button v-if="hasPermission('admin:user:reset-password')" class="link-button" :disabled="busyUserId === user.id" @click="openResetPassword(user)">重置密码</button>
-            <button v-if="hasPermission('admin:user:update')" class="link-button" :disabled="busyUserId === user.id" @click="forceLogout(user)">强制下线</button>
-            <button v-if="hasPermission('admin:user:disable')" class="link-button" :disabled="busyUserId === user.id" @click="toggleActive(user)">{{ user.is_active ? '禁用' : '启用' }}</button>
-            <button v-if="hasPermission('admin:user:delete')" class="link-button danger-text" :disabled="busyUserId === user.id" @click="removeUser(user)">删除</button>
+            <div class="table-actions">
+              <button v-if="hasPermission('admin:user:update')" class="table-action" :disabled="busyUserId === user.id" @click="openEdit(user)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
+              <button v-if="hasPermission('admin:user:reset-password')" class="table-action" :disabled="busyUserId === user.id" @click="openResetPassword(user)"><KeyRound :size="15" :stroke-width="2" aria-hidden="true" />重置密码</button>
+              <button v-if="hasPermission('admin:user:update')" class="table-action" :disabled="busyUserId === user.id" @click="forceLogout(user)"><LogOut :size="15" :stroke-width="2" aria-hidden="true" />强制下线</button>
+              <button v-if="hasPermission('admin:user:disable')" class="table-action" :disabled="busyUserId === user.id" @click="toggleActive(user)"><Power :size="15" :stroke-width="2" aria-hidden="true" />{{ user.is_active ? '禁用' : '启用' }}</button>
+              <button v-if="hasPermission('admin:user:delete')" class="table-action danger" :disabled="busyUserId === user.id" @click="removeUser(user)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
+            </div>
           </td>
         </tr>
       </tbody>
@@ -237,13 +245,14 @@ onMounted(async () => {
     </div>
     <div class="empty-state" v-if="!loading && !items.length">暂无用户</div>
 
-    <PaginationBar
-      v-model:page="page"
-      v-model:page-size="pageSize"
-      :total="total"
-      :page-size-options="[8, 10, 20, 50]"
-      @change="load"
-    />
+      <PaginationBar
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-size-options="[8, 10, 20, 50]"
+        @change="load"
+      />
+    </div>
 
     <div v-if="showModal" class="modal-mask">
       <div class="modal">

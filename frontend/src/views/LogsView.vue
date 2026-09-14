@@ -73,31 +73,32 @@ onMounted(loadOperations)
       <button :class="{ active: tab === 'login' }" @click="changeTab('login')">登录日志</button>
     </div>
 
-    <div class="toolbar">
-      <input v-model="username" class="input" style="max-width: 220px" placeholder="用户名" @keyup.enter="page = 1; tab === 'operation' ? loadOperations() : loadLogin()" />
-      <select v-if="tab === 'operation'" v-model="moduleFilter" class="select" style="max-width: 160px" @change="page = 1; loadOperations()">
-        <option value="">全部模块</option>
-        <option value="user">user</option>
-        <option value="role">role</option>
-        <option value="menu">menu</option>
-        <option value="permission">permission</option>
-        <option value="config">config</option>
-      </select>
-      <select v-if="tab === 'login'" v-model="successFilter" class="select" style="max-width: 140px" @change="page = 1; loadLogin()">
-        <option value="">全部结果</option>
-        <option value="true">成功</option>
-        <option value="false">失败</option>
-      </select>
-      <button class="secondary-button" @click="page = 1; tab === 'operation' ? loadOperations() : loadLogin()">查询</button>
-      <button v-if="hasPermission('admin:log:export') && tab === 'operation'" class="secondary-button" @click="exportCsv('/api/admin/logs/operations.csv')">
-        <Download :size="16" :stroke-width="2" aria-hidden="true" />
-        导出操作日志
-      </button>
-      <button v-if="hasPermission('admin:log:export') && tab === 'login'" class="secondary-button" @click="exportCsv('/api/admin/logs/login.csv')">
-        <Download :size="16" :stroke-width="2" aria-hidden="true" />
-        导出登录日志
-      </button>
-    </div>
+    <div class="list-card">
+      <div class="toolbar">
+        <input v-model="username" class="input" style="max-width: 220px" placeholder="用户名" @keyup.enter="page = 1; tab === 'operation' ? loadOperations() : loadLogin()" />
+        <select v-if="tab === 'operation'" v-model="moduleFilter" class="select" style="max-width: 160px" @change="page = 1; loadOperations()">
+          <option value="">全部模块</option>
+          <option value="user">user</option>
+          <option value="role">role</option>
+          <option value="menu">menu</option>
+          <option value="permission">permission</option>
+          <option value="config">config</option>
+        </select>
+        <select v-if="tab === 'login'" v-model="successFilter" class="select" style="max-width: 140px" @change="page = 1; loadLogin()">
+          <option value="">全部结果</option>
+          <option value="true">成功</option>
+          <option value="false">失败</option>
+        </select>
+        <button class="secondary-button" @click="page = 1; tab === 'operation' ? loadOperations() : loadLogin()">查询</button>
+        <button v-if="hasPermission('admin:log:export') && tab === 'operation'" class="secondary-button" @click="exportCsv('/api/admin/logs/operations.csv')">
+          <Download :size="16" :stroke-width="2" aria-hidden="true" />
+          导出操作日志
+        </button>
+        <button v-if="hasPermission('admin:log:export') && tab === 'login'" class="secondary-button" @click="exportCsv('/api/admin/logs/login.csv')">
+          <Download :size="16" :stroke-width="2" aria-hidden="true" />
+          导出登录日志
+        </button>
+      </div>
 
     <p v-if="error" class="error">{{ error }}</p>
 
@@ -159,12 +160,13 @@ onMounted(loadOperations)
     </div>
     <div v-if="tab === 'login' && !loading && !loginItems.length" class="empty-state">暂无登录日志</div>
 
-    <PaginationBar
-      v-model:page="page"
-      v-model:page-size="pageSize"
-      :total="total"
-      :page-size-options="[20, 50, 100]"
-      @change="tab === 'operation' ? loadOperations() : loadLogin()"
-    />
+      <PaginationBar
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-size-options="[20, 50, 100]"
+        @change="tab === 'operation' ? loadOperations() : loadLogin()"
+      />
+    </div>
   </section>
 </template>

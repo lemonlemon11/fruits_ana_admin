@@ -3,6 +3,8 @@ import { onMounted, reactive, ref } from 'vue'
 import { del, get, patch, post } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
+import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
 import type { ListResponse, PermissionItem } from '../types'
 
 const items = ref<PermissionItem[]>([])
@@ -110,21 +112,22 @@ onMounted(load)
 
 <template>
   <section class="page-stack">
-    <div class="toolbar">
-      <input v-model="keyword" class="input" style="max-width: 220px" placeholder="搜索编码或名称" @keyup.enter="load" />
-      <select v-model="moduleFilter" class="select" style="max-width: 160px" @change="load">
-        <option value="">全部模块</option>
-        <option value="overview">overview</option>
-        <option value="settlement">settlement</option>
-        <option value="series">series</option>
-        <option value="import">import</option>
-        <option value="data">data</option>
-        <option value="ai">ai</option>
-        <option value="preview">preview</option>
-      </select>
-      <button class="secondary-button" @click="load">查询</button>
-      <button v-if="hasPermission('admin:permission:create')" class="primary-button toolbar-action" @click="openCreate">新增权限点</button>
-    </div>
+    <div class="list-card">
+      <div class="toolbar">
+        <input v-model="keyword" class="input" style="max-width: 220px" placeholder="搜索编码或名称" @keyup.enter="load" />
+        <select v-model="moduleFilter" class="select" style="max-width: 160px" @change="load">
+          <option value="">全部模块</option>
+          <option value="overview">overview</option>
+          <option value="settlement">settlement</option>
+          <option value="series">series</option>
+          <option value="import">import</option>
+          <option value="data">data</option>
+          <option value="ai">ai</option>
+          <option value="preview">preview</option>
+        </select>
+        <button class="secondary-button" @click="load">查询</button>
+        <button v-if="hasPermission('admin:permission:create')" class="primary-button toolbar-action" @click="openCreate">新增权限点</button>
+      </div>
 
     <p v-if="error" class="error">{{ error }}</p>
 
@@ -152,14 +155,17 @@ onMounted(load)
           <td><span class="tag" :class="item.is_active ? 'success' : 'danger'">{{ item.is_active ? '启用' : '停用' }}</span></td>
           <td>{{ item.description || '—' }}</td>
           <td>
-            <button v-if="hasPermission('admin:permission:update')" class="link-button" :disabled="busyId === item.id" @click="openEdit(item)">编辑</button>
-            <button v-if="hasPermission('admin:permission:delete')" class="link-button danger-text" :disabled="busyId === item.id" @click="removePermission(item)">删除</button>
+            <div class="table-actions">
+              <button v-if="hasPermission('admin:permission:update')" class="table-action" :disabled="busyId === item.id" @click="openEdit(item)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
+              <button v-if="hasPermission('admin:permission:delete')" class="table-action danger" :disabled="busyId === item.id" @click="removePermission(item)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
+            </div>
           </td>
         </tr>
       </tbody>
     </table>
     </div>
-    <div class="empty-state" v-if="!items.length">暂无权限点</div>
+      <div class="empty-state" v-if="!items.length">暂无权限点</div>
+    </div>
 
     <div v-if="showModal" class="modal-mask">
       <div class="modal">
