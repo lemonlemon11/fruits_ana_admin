@@ -39,5 +39,9 @@ export function notificationPlainText(html: string): string {
   if (!html) return ''
   const template = document.createElement('template')
   template.innerHTML = html
-  return (template.content.textContent || '').replace(/\s+/g, ' ').trim()
+  const text = (template.content.textContent || '').replace(/\s+/g, ' ').trim()
+  const imageCount = template.content.querySelectorAll('img').length
+  if (!imageCount) return text
+  const imageLabel = imageCount === 1 ? '[图片]' : `[${imageCount} 张图片]`
+  return [text, imageLabel].filter(Boolean).join(' ')
 }
