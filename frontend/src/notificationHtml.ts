@@ -1,8 +1,8 @@
 const ALLOWED_TAGS = new Set([
-  'P', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI', 'A', 'SPAN',
+  'P', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI', 'A', 'SPAN', 'IMG',
 ])
 
-const ALLOWED_ATTRS = new Set(['href', 'target', 'rel'])
+const ALLOWED_ATTRS = new Set(['href', 'target', 'rel', 'src', 'alt', 'width', 'height'])
 
 export function sanitizeNotificationHtml(html: string): string {
   if (!html) return ''
@@ -24,6 +24,11 @@ export function sanitizeNotificationHtml(html: string): string {
       if (!/^(https?:\/\/|mailto:)/i.test(href)) element.removeAttribute('href')
       element.setAttribute('rel', 'noopener noreferrer')
       element.setAttribute('target', '_blank')
+    }
+    if (element.tagName === 'IMG') {
+      const src = element.getAttribute('src') || ''
+      if (!/^(https?:\/\/|data:image\/)/i.test(src)) element.removeAttribute('src')
+      element.setAttribute('alt', element.getAttribute('alt') || '')
     }
   })
 

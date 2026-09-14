@@ -1,54 +1,77 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import '@vueup/vue-quill/dist/vue-quill.snow.css'
+import { QuillEditor } from '@vueup/vue-quill'
+import { notify } from '../feedback'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (event: 'update:modelValue', value: string): void }>()
-const editor = ref<HTMLElement | null>(null)
 
-onMounted(() => {
-  if (editor.value && props.modelValue) editor.value.innerHTML = props.modelValue
-})
+type QuillEditorExposed = InstanceType<typeof QuillEditor>
+type QuillInstance = ReturnType<QuillEditorExposed['getQuill']>
 
-watch(
-  () => props.modelValue,
-  (value) => {
-    if (editor.value && value !== editor.value.innerHTML) editor.value.innerHTML = value
-  },
-)
+let quill: QuillInstance | null = null
 
-function run(command: string, value?: string) {
-  editor.value?.focus()
-  document.execCommand(command, false, value)
-  emitChange()
+const toolbar = [
+  [{ header: [1, 2, 3, false] }],
+  ['bold', 'italic', 'underline', 'strike'],
+  [{ color: [] }, { background: [] }],
+  [{ list: 'ordered' }, { list: 'bullet' }],
+  ['blockquote', 'link', 'image'],
+  ['clean'],
+]
+
+function insertLocalImage() {
+  if (!quill) return
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.addEventListener('change', () => {
+    const file = input.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      notify('图片不能超过 2MB，请压缩后再上传', 'error')
+      return
+    }
+    const reader = new FileReader()
+    reader.addEventListener('load', () => {
+      if (!quill || typeof reader.result !== 'string') return
+      const range = quill.getSelection(true)
+      const index = range?.index ?? quill.getLength()
+      quill.insertEmbed(index, 'image', reader.result, 'user')
+      quill.setSelection(index + 1, 0, 'silent')
+    })
+    reader.readAsDataURL(file)
+  })
+  input.click()
 }
 
-function emitChange() {
-  if (editor.value) emit('update:modelValue', editor.value.innerHTML)
+const editorOptions = {
+  modules: {
+    toolbar: {
+      container: toolbar,
+      handlers: {
+        image: insertLocalImage,
+      },
+    },
+  },
+}
+
+function handleReady(instance: QuillInstance) {
+  quill = instance
 }
 </script>
 
 <template>
   <div class="rich-editor">
-    <div class="rich-editor-toolbar" role="toolbar" aria-label="富文本工具栏">
-      <button type="button" title="加粗" @mousedown.prevent="run('bold')">B</button>
-      <button type="button" title="斜体" @mousedown.prevent="run('italic')">I</button>
-      <button type="button" title="下划线" @mousedown.prevent="run('underline')">U</button>
-      <span class="rich-editor-sep"></span>
-      <button type="button" title="无序列表" @mousedown.prevent="run('insertUnorderedList')">• 列表</button>
-      <button type="button" title="有序列表" @mousedown.prevent="run('insertOrderedList')">1. 列表</button>
-      <span class="rich-editor-sep"></span>
-      <button type="button" title="插入链接" @mousedown.prevent="run('createLink', prompt('请输入链接地址') || '')">链接</button>
-      <button type="button" title="移除格式" @mousedown.prevent="run('removeFormat')">清除格式</button>
-    </div>
-    <div
-      ref="editor"
-      class="rich-editor-content"
-      contenteditable="true"
-      role="textbox"
-      aria-multiline="true"
-      @input="emitChange"
-      @blur="emitChange"
-    ></div>
+    <QuillEditor
+      :content="modelValue"
+      contentType="html"
+      theme="snow"
+      :options="editorOptions"
+      placeholder="请输入通知内容"
+      @update:content="emit('update:modelValue', $event)"
+      @ready="handleReady"
+    />
   </div>
 </template>
 
@@ -59,40 +82,61 @@ function emitChange() {
   border-radius: var(--radius-md);
   background: var(--surface);
 }
-.rich-editor-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .35rem;
-  padding: .47rem;
+
+.rich-editor :deep(.ql-toolbar.ql-snow) {
+  padding: .47rem .59rem;
+  border: 0;
   border-bottom: 1px solid var(--line);
   background: var(--surface-soft);
 }
-.rich-editor-toolbar button {
-  min-height: 2.24rem;
-  padding: 0 .59rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+
+.rich-editor :deep(.ql-container.ql-snow) {
+  min-height: 13.5rem;
+  border: 0;
   color: var(--ink);
-  font-size: .88rem;
-  font-weight: 700;
+  font-family: inherit;
+  font-size: .96rem;
 }
-.rich-editor-toolbar button:hover { border-color: var(--primary); color: var(--primary-dark); }
-.rich-editor-sep {
-  width: 1px;
-  height: 1.35rem;
-  align-self: center;
-  background: var(--line);
+
+.rich-editor :deep(.ql-editor) {
+  min-height: 13.5rem;
+  padding: .82rem .88rem;
+  line-height: 1.75;
 }
-.rich-editor-content {
-  min-height: 9.41rem;
-  padding: .82rem;
-  outline: none;
-  color: var(--ink);
-  line-height: 1.7;
-}
-.rich-editor-content:empty::before {
+
+.rich-editor :deep(.ql-editor.ql-blank::before) {
   color: var(--muted);
-  content: '请输入通知内容';
+  font-style: normal;
+  left: .88rem;
+  right: .88rem;
+}
+
+.rich-editor :deep(.ql-snow .ql-toolbar button:hover),
+.rich-editor :deep(.ql-snow .ql-toolbar button:focus),
+.rich-editor :deep(.ql-snow .ql-toolbar button.ql-active) {
+  color: var(--primary-dark);
+}
+
+.rich-editor :deep(.ql-snow .ql-toolbar button:hover .ql-fill),
+.rich-editor :deep(.ql-snow .ql-toolbar button:focus .ql-fill),
+.rich-editor :deep(.ql-snow .ql-toolbar button.ql-active .ql-fill) {
+  fill: var(--primary);
+}
+
+.rich-editor :deep(.ql-snow .ql-toolbar button:hover .ql-stroke),
+.rich-editor :deep(.ql-snow .ql-toolbar button:focus .ql-stroke),
+.rich-editor :deep(.ql-snow .ql-toolbar button.ql-active .ql-stroke) {
+  stroke: var(--primary);
+}
+
+.rich-editor :deep(.ql-snow.ql-toolbar .ql-picker-label:hover),
+.rich-editor :deep(.ql-snow.ql-toolbar .ql-picker-label.ql-active) {
+  color: var(--primary-dark);
+}
+
+.rich-editor :deep(.ql-editor img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
 }
 </style>
