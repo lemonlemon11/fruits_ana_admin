@@ -1,0 +1,38 @@
+const ALLOWED_TAGS = new Set([
+  'P', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI', 'A', 'SPAN',
+])
+
+const ALLOWED_ATTRS = new Set(['href', 'target', 'rel'])
+
+export function sanitizeNotificationHtml(html: string): string {
+  if (!html) return ''
+  const template = document.createElement('template')
+  template.innerHTML = html
+  const root = template.content
+
+  root.querySelectorAll('*').forEach((node) => {
+    const element = node as HTMLElement
+    if (!ALLOWED_TAGS.has(element.tagName)) {
+      element.replaceWith(...Array.from(element.childNodes))
+      return
+    }
+    Array.from(element.attributes).forEach((attr) => {
+      if (!ALLOWED_ATTRS.has(attr.name)) element.removeAttribute(attr.name)
+    })
+    if (element.tagName === 'A') {
+      const href = element.getAttribute('href') || ''
+      if (!/^(https?:\/\/|mailto:)/i.test(href)) element.removeAttribute('href')
+      element.setAttribute('rel', 'noopener noreferrer')
+      element.setAttribute('target', '_blank')
+    }
+  })
+
+  return template.innerHTML
+}
+
+export function notificationPlainText(html: string): string {
+  if (!html) return ''
+  const template = document.createElement('template')
+  template.innerHTML = html
+  return (template.content.textContent || '').replace(/\s+/g, ' ').trim()
+}

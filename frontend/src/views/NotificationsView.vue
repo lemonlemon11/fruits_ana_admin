@@ -3,6 +3,8 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { del, get, patch, post } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import RichTextEditor from '../components/RichTextEditor.vue'
+import { notificationPlainText, sanitizeNotificationHtml } from '../notificationHtml'
 import type { ListResponse, NotificationItem, RoleItem, UserItem } from '../types'
 
 const items = ref<NotificationItem[]>([])
@@ -117,7 +119,8 @@ function openEdit(item: NotificationItem) {
 }
 
 async function save() {
-  if (!form.title.trim() || !form.content.trim()) {
+  const sanitizedContent = sanitizeNotificationHtml(form.content)
+  if (!form.title.trim() || !notificationPlainText(sanitizedContent)) {
     notify('标题和内容不能为空', 'error')
     return
   }
@@ -128,7 +131,7 @@ async function save() {
   saving.value = true
   const payload = {
     title: form.title.trim(),
-    content: form.content.trim(),
+    content: sanitizedContent,
     notification_type: form.notification_type,
     priority: form.priority,
     target_type: form.target_type,
@@ -281,7 +284,7 @@ onMounted(async () => {
         </div>
         <div class="field">
           <label>内容</label>
-          <textarea v-model="form.content" class="textarea" rows="5"></textarea>
+          <RichTextEditor v-model="form.content" />
         </div>
         <div class="field-grid">
           <div class="field">
