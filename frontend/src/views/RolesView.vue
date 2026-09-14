@@ -158,12 +158,10 @@ onMounted(async () => {
 
 <template>
   <section class="page-stack">
-    <div class="page-header">
-      <div class="page-actions">
-        <button v-if="hasPermission('admin:role:create')" class="primary-button" @click="openCreate">新增角色</button>
-      </div>
+    <div class="toolbar">
+      <span class="toolbar-summary">共 {{ roles.length }} 个角色</span>
+      <button v-if="hasPermission('admin:role:create')" class="primary-button toolbar-action" @click="openCreate">新增角色</button>
     </div>
-
     <p v-if="error" class="error">{{ error }}</p>
 
     <div class="table-wrap">

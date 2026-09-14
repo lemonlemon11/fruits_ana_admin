@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import RefreshCw from '@lucide/vue/dist/esm/icons/refresh-cw.mjs'
 import { get } from '../api/client'
 import type { DashboardStats } from '../types'
 
@@ -81,12 +82,6 @@ onMounted(load)
 
 <template>
   <section class="page-stack dashboard-page">
-    <div class="page-header">
-      <div class="page-header-actions">
-        <button class="secondary-button" @click="load">刷新数据</button>
-      </div>
-    </div>
-
     <p v-if="error" class="error">{{ error }}</p>
     <div v-if="loading && !stats" class="empty-state">正在加载看板数据...</div>
 
@@ -112,6 +107,10 @@ onMounted(load)
           <strong>{{ stats.login_total_7d }}</strong>
           <span>近 7 日登录</span>
         </RouterLink>
+        <button class="quick-action dashboard-refresh-action" type="button" @click="load">
+          <RefreshCw :size="20" :stroke-width="2" aria-hidden="true" />
+          <span>刷新数据</span>
+        </button>
       </div>
 
       <div class="dashboard-grid">

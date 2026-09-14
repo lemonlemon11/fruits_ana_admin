@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import Download from '@lucide/vue/dist/esm/icons/download.mjs'
 import { get } from '../api/client'
 import { hasPermission } from '../auth'
 import type { ListResponse, LoginLogItem, OperationLogItem } from '../types'
@@ -57,6 +58,10 @@ async function changeTab(next: 'login' | 'operation') {
   else await loadOperations()
 }
 
+function exportCsv(path: string) {
+  window.location.href = path
+}
+
 onMounted(loadOperations)
 </script>
 
@@ -83,8 +88,14 @@ onMounted(loadOperations)
         <option value="false">失败</option>
       </select>
       <button class="secondary-button" @click="page = 1; tab === 'operation' ? loadOperations() : loadLogin()">查询</button>
-      <a v-if="hasPermission('admin:log:export') && tab === 'operation'" class="link-button" href="/api/admin/logs/operations.csv">导出操作日志</a>
-      <a v-if="hasPermission('admin:log:export') && tab === 'login'" class="link-button" href="/api/admin/logs/login.csv">导出登录日志</a>
+      <button v-if="hasPermission('admin:log:export') && tab === 'operation'" class="secondary-button" @click="exportCsv('/api/admin/logs/operations.csv')">
+        <Download :size="16" :stroke-width="2" aria-hidden="true" />
+        导出操作日志
+      </button>
+      <button v-if="hasPermission('admin:log:export') && tab === 'login'" class="secondary-button" @click="exportCsv('/api/admin/logs/login.csv')">
+        <Download :size="16" :stroke-width="2" aria-hidden="true" />
+        导出登录日志
+      </button>
     </div>
 
     <p v-if="error" class="error">{{ error }}</p>

@@ -81,6 +81,8 @@ h3 { margin-bottom: 0; font-size: 1.2rem; line-height: 1.4; }
   color: var(--ink);
 }
 .toolbar input, .toolbar select { width: auto; min-width: 160px; }
+.toolbar-summary { color: var(--muted); font-size: .95rem; font-weight: 700; }
+.toolbar-action { margin-left: auto; }
 .primary-button, .secondary-button, .text-button, .danger-button {
   display: inline-flex; align-items: center; justify-content: center; gap: .47rem; min-height: 3.06rem;
   border-radius: var(--radius-sm); font-size: 1.1rem; font-weight: 700; text-decoration: none;
@@ -411,6 +413,8 @@ h3 { margin-bottom: 0; font-size: 1.2rem; line-height: 1.4; }
 .quick-action:hover { border-color: var(--primary-dark); background: var(--surface-soft); }
 .quick-action strong { color: var(--primary-dark); font-family: Bahnschrift, "Microsoft YaHei", sans-serif; font-size: 1.65rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .quick-action span { color: var(--muted); font-size: .95rem; }
+.dashboard-refresh-action { border-top-color: var(--warning); color: var(--primary-dark); }
+.dashboard-refresh-action svg { color: var(--primary); }
 .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(205px, 1fr)); gap: .82rem; }
 .dashboard-grid-wide { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .stat-card { display: grid; min-height: 8.24rem; align-content: center; gap: .35rem; padding: 1rem 1rem 1rem 1.29rem; }
@@ -478,6 +482,18 @@ h3 { margin-bottom: 0; font-size: 1.2rem; line-height: 1.4; }
 .grant-group-body { display: grid; gap: .18rem; margin-top: .47rem; }
 .grant-group-body .checkbox-row { min-height: 2.35rem; }
 .menu-tree { display: grid; gap: 0; padding: .47rem 0; }
+.menu-tree-toolbar {
+  display: flex;
+  min-height: 3.06rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: .71rem;
+  margin: .12rem .47rem .59rem;
+  padding: .47rem .59rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
 .menu-tree-node { display: grid; min-width: 0; }
 .menu-tree-row {
   display: grid;

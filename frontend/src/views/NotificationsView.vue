@@ -196,12 +196,6 @@ onMounted(async () => {
 
 <template>
   <section class="page-stack">
-    <div class="page-header">
-      <div class="page-actions">
-        <button v-if="hasPermission('admin:notification:create')" class="primary-button" @click="openCreate">新建通知</button>
-      </div>
-    </div>
-
     <div class="toolbar">
       <input v-model="keyword" class="input" style="max-width: 220px" placeholder="标题/内容" @keyup.enter="page = 1; load()" />
       <select v-model="typeFilter" class="select" style="max-width: 130px" @change="page = 1; load()">
@@ -222,6 +216,7 @@ onMounted(async () => {
         <option value="false">草稿</option>
       </select>
       <button class="secondary-button" @click="page = 1; load()">查询</button>
+      <button v-if="hasPermission('admin:notification:create')" class="primary-button toolbar-action" @click="openCreate">新建通知</button>
     </div>
 
     <p v-if="error" class="error">{{ error }}</p>

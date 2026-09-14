@@ -183,12 +183,6 @@ onMounted(async () => {
 
 <template>
   <section class="page-stack">
-    <div class="page-header">
-      <div class="page-actions">
-        <button v-if="hasPermission('admin:user:create')" class="primary-button" @click="openCreate">新增用户</button>
-      </div>
-    </div>
-
     <div class="toolbar">
       <input v-model="keyword" class="input" style="max-width: 220px" placeholder="搜索用户名" @keyup.enter="page = 1; load()" />
       <select v-model="roleFilter" class="select" style="max-width: 180px" @change="page = 1; load()">
@@ -201,6 +195,7 @@ onMounted(async () => {
         <option value="false">禁用</option>
       </select>
       <button class="secondary-button" @click="page = 1; load()">查询</button>
+      <button v-if="hasPermission('admin:user:create')" class="primary-button toolbar-action" @click="openCreate">新增用户</button>
     </div>
 
     <p v-if="error" class="error">{{ error }}</p>

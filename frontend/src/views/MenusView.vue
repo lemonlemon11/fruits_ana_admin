@@ -128,15 +128,13 @@ onMounted(load)
 
 <template>
   <section class="page-stack">
-    <div class="page-header">
-      <div class="page-actions">
-        <button v-if="hasPermission('admin:menu:create')" class="primary-button" @click="openCreate">新增菜单</button>
-      </div>
-    </div>
-
     <p v-if="error" class="error">{{ error }}</p>
 
     <div class="card menu-tree">
+      <div class="menu-tree-toolbar">
+        <span class="toolbar-summary">菜单树</span>
+        <button v-if="hasPermission('admin:menu:create')" class="primary-button" @click="openCreate">新增菜单</button>
+      </div>
       <MenuTreeNode
         v-for="menu in tree"
         :key="menu.id"

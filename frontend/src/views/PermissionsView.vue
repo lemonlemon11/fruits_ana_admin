@@ -110,12 +110,6 @@ onMounted(load)
 
 <template>
   <section class="page-stack">
-    <div class="page-header">
-      <div class="page-actions">
-        <button v-if="hasPermission('admin:permission:create')" class="primary-button" @click="openCreate">新增权限点</button>
-      </div>
-    </div>
-
     <div class="toolbar">
       <input v-model="keyword" class="input" style="max-width: 220px" placeholder="搜索编码或名称" @keyup.enter="load" />
       <select v-model="moduleFilter" class="select" style="max-width: 160px" @change="load">
@@ -129,6 +123,7 @@ onMounted(load)
         <option value="preview">preview</option>
       </select>
       <button class="secondary-button" @click="load">查询</button>
+      <button v-if="hasPermission('admin:permission:create')" class="primary-button toolbar-action" @click="openCreate">新增权限点</button>
     </div>
 
     <p v-if="error" class="error">{{ error }}</p>
