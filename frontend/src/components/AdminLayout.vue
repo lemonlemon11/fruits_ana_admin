@@ -3,12 +3,15 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import ArrowUp from '@lucide/vue/dist/esm/icons/arrow-up.mjs'
 import Bell from '@lucide/vue/dist/esm/icons/bell.mjs'
+import BookOpen from '@lucide/vue/dist/esm/icons/book-open.mjs'
 import Clock3 from '@lucide/vue/dist/esm/icons/clock-3.mjs'
 import Database from '@lucide/vue/dist/esm/icons/database.mjs'
 import FolderTree from '@lucide/vue/dist/esm/icons/folder-tree.mjs'
+import Headphones from '@lucide/vue/dist/esm/icons/headphones.mjs'
 import KeyRound from '@lucide/vue/dist/esm/icons/key-round.mjs'
 import LayoutDashboard from '@lucide/vue/dist/esm/icons/layout-dashboard.mjs'
 import LogOut from '@lucide/vue/dist/esm/icons/log-out.mjs'
+import MessageCircle from '@lucide/vue/dist/esm/icons/message-circle.mjs'
 import PanelLeftClose from '@lucide/vue/dist/esm/icons/panel-left-close.mjs'
 import PanelLeftOpen from '@lucide/vue/dist/esm/icons/panel-left-open.mjs'
 import PanelRightClose from '@lucide/vue/dist/esm/icons/panel-right-close.mjs'
@@ -260,6 +263,15 @@ async function handleLogout() {
         <main>
           <RouterView :key="viewKey" />
         </main>
+        <footer class="app-footer">
+          <span class="app-footer-copy">SLD-水果市场销售分析系统©2026</span>
+          <nav class="app-footer-actions" aria-label="系统服务">
+            <button type="button"><BookOpen :size="16" :stroke-width="2" aria-hidden="true" />使用手册</button>
+            <button type="button"><MessageCircle :size="16" :stroke-width="2" aria-hidden="true" />微信公众号</button>
+            <button type="button"><ShieldCheck :size="16" :stroke-width="2" aria-hidden="true" />正版查询</button>
+            <button type="button"><Headphones :size="16" :stroke-width="2" aria-hidden="true" />联系人工客服</button>
+          </nav>
+        </footer>
         <div
           v-if="contextMenu"
           class="tab-context-menu"
