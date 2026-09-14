@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { del, get } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import PaginationBar from '../components/PaginationBar.vue'
 import type { AiCacheItem, DataIssueItem, ImportBatchItem, ListResponse } from '../types'
 
 const tab = ref<'imports' | 'issues' | 'ai'>('imports')
@@ -135,11 +136,13 @@ onMounted(loadImports)
       </table>
       </div>
       <div class="empty-state" v-if="!loading && !imports.length">暂无导入批次</div>
-      <div class="pagination">
-        <button class="secondary-button" :disabled="page <= 1" @click="page--; loadImports()">上一页</button>
-        <span>{{ page }}</span>
-        <button class="secondary-button" :disabled="page * pageSize >= importTotal" @click="page++; loadImports()">下一页</button>
-      </div>
+      <PaginationBar
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :total="importTotal"
+        :page-size-options="[10, 20, 50, 100]"
+        @change="loadImports"
+      />
     </div>
 
     <div v-if="tab === 'issues'">

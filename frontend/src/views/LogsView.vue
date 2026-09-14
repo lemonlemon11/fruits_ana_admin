@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import Download from '@lucide/vue/dist/esm/icons/download.mjs'
 import { get } from '../api/client'
 import { hasPermission } from '../auth'
+import PaginationBar from '../components/PaginationBar.vue'
 import type { ListResponse, LoginLogItem, OperationLogItem } from '../types'
 
 const tab = ref<'login' | 'operation'>('operation')
@@ -158,10 +159,12 @@ onMounted(loadOperations)
     </div>
     <div v-if="tab === 'login' && !loading && !loginItems.length" class="empty-state">暂无登录日志</div>
 
-    <div class="pagination">
-      <button class="secondary-button" :disabled="page <= 1" @click="page--; tab === 'operation' ? loadOperations() : loadLogin()">上一页</button>
-      <span>{{ page }}</span>
-      <button class="secondary-button" :disabled="page * pageSize >= total" @click="page++; tab === 'operation' ? loadOperations() : loadLogin()">下一页</button>
-    </div>
+    <PaginationBar
+      v-model:page="page"
+      v-model:page-size="pageSize"
+      :total="total"
+      :page-size-options="[20, 50, 100]"
+      @change="tab === 'operation' ? loadOperations() : loadLogin()"
+    />
   </section>
 </template>

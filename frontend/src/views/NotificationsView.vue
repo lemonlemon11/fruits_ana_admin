@@ -4,6 +4,7 @@ import { del, get, patch, post } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
 import RichTextEditor from '../components/RichTextEditor.vue'
+import PaginationBar from '../components/PaginationBar.vue'
 import { notificationPlainText, sanitizeNotificationHtml } from '../notificationHtml'
 import type { ListResponse, NotificationItem, RoleItem, UserItem } from '../types'
 
@@ -257,11 +258,13 @@ onMounted(async () => {
     </div>
     <div v-if="!loading && !items.length" class="empty-state">暂无通知</div>
 
-    <div class="pagination">
-      <button class="secondary-button" :disabled="page <= 1" @click="page--; load()">上一页</button>
-      <span>{{ page }} / {{ totalPages }}</span>
-      <button class="secondary-button" :disabled="page >= totalPages" @click="page++; load()">下一页</button>
-    </div>
+    <PaginationBar
+      v-model:page="page"
+      v-model:page-size="pageSize"
+      :total="total"
+      :page-size-options="[10, 20, 50, 100]"
+      @change="load"
+    />
 
     <div v-if="showModal" class="modal-mask">
       <div class="modal notification-modal">

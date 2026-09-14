@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { del, get, patch, post } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
+import PaginationBar from '../components/PaginationBar.vue'
 import type { ListResponse, RoleItem, UserItem } from '../types'
 
 const items = ref<UserItem[]>([])
@@ -236,11 +237,13 @@ onMounted(async () => {
     </div>
     <div class="empty-state" v-if="!loading && !items.length">暂无用户</div>
 
-    <div class="pagination">
-      <button class="secondary-button" :disabled="page <= 1" @click="page--; load()">上一页</button>
-      <span>{{ page }} / {{ totalPages }}</span>
-      <button class="secondary-button" :disabled="page >= totalPages" @click="page++; load()">下一页</button>
-    </div>
+    <PaginationBar
+      v-model:page="page"
+      v-model:page-size="pageSize"
+      :total="total"
+      :page-size-options="[8, 10, 20, 50]"
+      @change="load"
+    />
 
     <div v-if="showModal" class="modal-mask">
       <div class="modal">
