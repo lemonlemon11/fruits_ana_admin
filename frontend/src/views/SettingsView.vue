@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { get, patch } from '../api/client'
 import { notify } from '../feedback'
 import { hasPermission } from '../auth'
 import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
+import DataTable, { type DataTableColumn } from '../components/DataTable.vue'
 
 type SettingItem = { key: string; value: string | null; description: string | null }
 
@@ -12,6 +13,17 @@ const editingKey = ref<string | null>(null)
 const editValue = ref('')
 const error = ref('')
 const saving = ref(false)
+
+// 「操作」列只有具备配置修改权限时才出现，所以列定义用 computed。
+const columns = computed<DataTableColumn<SettingItem>[]>(() => {
+  const base: DataTableColumn<SettingItem>[] = [
+    { key: 'key', label: '配置项', emphasis: true, rowHeader: true },
+    { key: 'value', label: '值' },
+    { key: 'description', label: '说明', value: (item) => item.description || '—' },
+  ]
+  if (hasPermission('admin:config:update')) base.push({ key: 'actions', label: '操作' })
+  return base
+})
 
 async function load() {
   error.value = ''
@@ -50,34 +62,28 @@ onMounted(load)
   <section class="page-stack">
     <p v-if="error" class="error">{{ error }}</p>
 
-    <div class="card table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>配置项</th>
-            <th>值</th>
-            <th>说明</th>
-            <th v-if="hasPermission('admin:config:update')">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in items" :key="item.key">
-            <td><code>{{ item.key }}</code></td>
-            <td>
-              <span v-if="editingKey !== item.key">{{ item.value || '—' }}</span>
-              <input v-else v-model="editValue" class="input" />
-            </td>
-            <td>{{ item.description || '—' }}</td>
-            <td v-if="hasPermission('admin:config:update')">
-              <button v-if="editingKey !== item.key" class="table-action" @click="openEdit(item)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
-              <template v-else>
-                <button class="primary-button" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存' }}</button>
-                <button class="secondary-button" :disabled="saving" @click="editingKey = null">取消</button>
-              </template>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      :columns="columns"
+      :rows="items"
+      :row-key="(item) => item.key"
+      caption="管理端系统配置列表"
+      min-width="720px"
+      :empty-text="'暂无配置项'"
+    >
+      <template #cell-key="{ row }">
+        <code>{{ row.key }}</code>
+      </template>
+      <template #cell-value="{ row }">
+        <span v-if="editingKey !== row.key">{{ row.value || '—' }}</span>
+        <input v-else v-model="editValue" class="input" />
+      </template>
+      <template #cell-actions="{ row }">
+        <button v-if="editingKey !== row.key" class="table-action" @click="openEdit(row)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
+        <template v-else>
+          <button class="primary-button" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存' }}</button>
+          <button class="secondary-button" :disabled="saving" @click="editingKey = null">取消</button>
+        </template>
+      </template>
+    </DataTable>
   </section>
 </template>

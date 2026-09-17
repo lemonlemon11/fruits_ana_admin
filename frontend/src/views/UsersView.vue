@@ -9,6 +9,7 @@ import LogOut from '@lucide/vue/dist/esm/icons/log-out.mjs'
 import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
 import Power from '@lucide/vue/dist/esm/icons/power.mjs'
 import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
+import DataTable, { type DataTableColumn } from '../components/DataTable.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { ListResponse, RoleItem, UserItem } from '../types'
 
@@ -16,7 +17,7 @@ const items = ref<UserItem[]>([])
 const total = ref(0)
 const roles = ref<RoleItem[]>([])
 const page = ref(1)
-const pageSize = ref(8)
+const pageSize = ref(10)
 const keyword = ref('')
 const roleFilter = ref<number | ''>('')
 const activeFilter = ref<'' | 'true' | 'false'>('')
@@ -31,6 +32,17 @@ const passwordTarget = ref<UserItem | null>(null)
 const newPassword = ref('')
 const saving = ref(false)
 const busyUserId = ref<number | null>(null)
+
+/** 用户列表列固定，角色 / 状态 / 操作走插槽渲染。 */
+const columns: DataTableColumn<UserItem>[] = [
+  { key: 'id', label: 'ID', numeric: true },
+  { key: 'display_name', label: '用户名', emphasis: true, rowHeader: true },
+  { key: 'roles', label: '角色' },
+  { key: 'is_active', label: '状态' },
+  { key: 'last_login_at', label: '最后登录', value: (user) => (user.last_login_at ? new Date(user.last_login_at).toLocaleString() : '—') },
+  { key: 'created_at', label: '创建时间', value: (user) => new Date(user.created_at).toLocaleString() },
+  { key: 'actions', label: '操作' },
+]
 
 useEscapeClose(() => showPasswordModal.value, () => {
   showPasswordModal.value = false
@@ -215,51 +227,40 @@ onMounted(async () => {
 
     <p v-if="error" class="error">{{ error }}</p>
 
-    <div class="table-wrap fixed-height-list">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>用户名</th>
-          <th>角色</th>
-          <th>状态</th>
-          <th>最后登录</th>
-          <th>创建时间</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="user in items" :key="user.id">
-          <td>{{ user.id }}</td>
-          <td>{{ user.display_name }}</td>
-          <td>
-            <span v-for="role in user.roles" :key="role.id" class="tag" style="margin-right: 4px">{{ role.name }}</span>
-          </td>
-          <td><span class="tag" :class="user.is_active ? 'success' : 'danger'">{{ user.is_active ? '启用' : '禁用' }}</span></td>
-          <td>{{ user.last_login_at ? new Date(user.last_login_at).toLocaleString() : '—' }}</td>
-          <td>{{ new Date(user.created_at).toLocaleString() }}</td>
-          <td>
-            <div class="table-actions">
-              <button v-if="hasPermission('admin:user:update')" class="table-action" :disabled="busyUserId === user.id" @click="openEdit(user)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
-              <button v-if="hasPermission('admin:user:reset-password')" class="table-action" :disabled="busyUserId === user.id" @click="openResetPassword(user)"><KeyRound :size="15" :stroke-width="2" aria-hidden="true" />重置密码</button>
-              <button v-if="hasPermission('admin:user:update')" class="table-action" :disabled="busyUserId === user.id" @click="forceLogout(user)"><LogOut :size="15" :stroke-width="2" aria-hidden="true" />强制下线</button>
-              <button v-if="hasPermission('admin:user:disable')" class="table-action" :disabled="busyUserId === user.id" @click="toggleActive(user)"><Power :size="15" :stroke-width="2" aria-hidden="true" />{{ user.is_active ? '禁用' : '启用' }}</button>
-              <button v-if="hasPermission('admin:user:delete')" class="table-action danger" :disabled="busyUserId === user.id" @click="removeUser(user)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    </div>
-    <div class="empty-state" v-if="!loading && !items.length">暂无用户</div>
-
-      <PaginationBar
-        v-model:page="page"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="[8, 10, 20, 50]"
-        @change="load"
-      />
+    <DataTable
+      class="fixed-height-list"
+      :columns="columns"
+      :rows="items"
+      :row-key="(user) => user.id"
+      caption="管理端用户列表"
+      min-width="720px"
+      :empty-text="loading ? '正在加载…' : '暂无用户'"
+    >
+      <template #cell-roles="{ row }">
+        <span v-for="role in row.roles" :key="role.id" class="tag" style="margin-right: 4px">{{ role.name }}</span>
+      </template>
+      <template #cell-is_active="{ row }">
+        <span class="tag" :class="row.is_active ? 'success' : 'danger'">{{ row.is_active ? '启用' : '禁用' }}</span>
+      </template>
+      <template #cell-actions="{ row }">
+        <div class="table-actions">
+          <button v-if="hasPermission('admin:user:update')" class="table-action" :disabled="busyUserId === row.id" @click="openEdit(row)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
+          <button v-if="hasPermission('admin:user:reset-password')" class="table-action" :disabled="busyUserId === row.id" @click="openResetPassword(row)"><KeyRound :size="15" :stroke-width="2" aria-hidden="true" />重置密码</button>
+          <button v-if="hasPermission('admin:user:update')" class="table-action" :disabled="busyUserId === row.id" @click="forceLogout(row)"><LogOut :size="15" :stroke-width="2" aria-hidden="true" />强制下线</button>
+          <button v-if="hasPermission('admin:user:disable')" class="table-action" :disabled="busyUserId === row.id" @click="toggleActive(row)"><Power :size="15" :stroke-width="2" aria-hidden="true" />{{ row.is_active ? '禁用' : '启用' }}</button>
+          <button v-if="hasPermission('admin:user:delete')" class="table-action danger" :disabled="busyUserId === row.id" @click="removeUser(row)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
+        </div>
+      </template>
+      <template #footer>
+        <PaginationBar
+          v-model:page="page"
+          v-model:page-size="pageSize"
+          :total="total"
+          :page-size-options="[10, 20, 50, 100]"
+          @change="load"
+        />
+      </template>
+    </DataTable>
     </div>
 
     <div v-if="showModal" class="drawer-mask" @click.self="showModal = false">
@@ -322,7 +323,7 @@ onMounted(async () => {
   min-height: 31rem;
   overflow-y: hidden;
 }
-.fixed-height-list .table { min-width: 720px; }
+
 @media (max-width: 820px) {
   .fixed-height-list {
     height: auto;

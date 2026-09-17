@@ -24,6 +24,8 @@ const routes = [
       { path: 'data', component: () => import('./views/DataView.vue'), meta: { requiresAuth: true, permission: 'admin:data:view', title: '业务数据' } },
       { path: 'logs', component: () => import('./views/LogsView.vue'), meta: { requiresAuth: true, permission: 'admin:log:view', title: '审计日志' } },
       { path: 'settings', component: () => import('./views/SettingsView.vue'), meta: { requiresAuth: true, permission: 'admin:config:view', title: '系统配置' } },
+      { path: 'entry-fields', component: () => import('./views/EntryFieldConfigView.vue'), meta: { requiresAuth: true, fruitAdminOnly: true, title: '录单字段配置' } },
+      { path: 'field-conversions', component: () => import('./views/FieldConversionConfigView.vue'), meta: { requiresAuth: true, fruitAdminOnly: true, title: '字段转换配置' } },
     ],
   },
 ]
@@ -42,6 +44,9 @@ router.beforeEach(async (to) => {
     return '/admin/dashboard'
   }
   if (to.meta.permission && !currentUser.value?.permissions.includes(String(to.meta.permission))) {
+    return '/admin/dashboard'
+  }
+  if (to.meta.fruitAdminOnly && !currentUser.value?.roles.some((role) => role.code === 'fruit_admin')) {
     return '/admin/dashboard'
   }
   return true

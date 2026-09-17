@@ -17,6 +17,8 @@ from .models import (
     AdminRoleMenu,
     AdminRolePermission,
     AdminUserRole,
+    EntryFieldOption,
+    FieldConversionRule,
     User,
 )
 
@@ -29,9 +31,14 @@ FRUIT_PERMISSIONS: list[tuple[str, str, str, str]] = [
     ("import:view", "查看数据导入", "import", "menu"),
     ("import:upload", "上传导入文件", "import", "action"),
     ("import:process", "处理导入批次", "import", "action"),
+    ("entry:view", "查看手工录单", "entry", "menu"),
+    ("entry:create", "新增手工录单", "entry", "action"),
+    ("entry:update", "修改手工录单", "entry", "action"),
+    ("entry:export", "导出手工录单", "entry", "action"),
     ("data:export", "导出业务数据", "data", "action"),
     ("ai:refresh", "刷新 AI 分析", "ai", "action"),
     ("preview:view", "查看公开预览", "preview", "menu"),
+    ("ask:view", "使用数据问答顺仔", "ask", "action"),
 ]
 
 FRUIT_MENUS: list[dict] = [
@@ -78,6 +85,17 @@ FRUIT_MENUS: list[dict] = [
         "icon": "Upload",
         "permission_code": "import:view",
         "sort_order": 30,
+    },
+    {
+        "key": "entry",
+        "parent": "sales-analysis",
+        "name": "手工录单",
+        "menu_type": "menu",
+        "route_path": "/entry",
+        "component": "EntryView",
+        "icon": "FilePen",
+        "permission_code": "entry:view",
+        "sort_order": 40,
     },
     {
         "key": "settlement-analysis",
@@ -159,6 +177,10 @@ FRUIT_ROLES: list[dict] = [
             "import:view",
             "import:upload",
             "import:process",
+            "entry:view",
+            "entry:create",
+            "entry:update",
+            "entry:export",
             "data:export",
             "ai:refresh",
         ],
@@ -167,6 +189,7 @@ FRUIT_ROLES: list[dict] = [
             "overview",
             "settlements",
             "imports",
+            "entry",
             "settlement-analysis",
             "settlement-detail",
             "settlement-comparison",
@@ -208,10 +231,15 @@ FRUIT_ROLES: list[dict] = [
             "import:view",
             "import:upload",
             "import:process",
+            "entry:view",
+            "entry:create",
+            "entry:update",
+            "entry:export",
         ],
         "menus": [
             "sales-analysis",
             "imports",
+            "entry",
         ],
     },
 ]
@@ -228,6 +256,8 @@ def seed_admin_data(db: Session) -> None:
     _seed_roles(db, permission_by_code, menu_by_key)
     _assign_user_role(db, "test", "fruit_admin")
     _seed_admin_access(db, "test")
+    _seed_entry_field_options(db)
+    _seed_field_conversion_rules(db)
     db.commit()
 
 
@@ -420,3 +450,58 @@ def _seed_admin_access(db: Session, username: str) -> None:
     else:
         access.is_active = True
         access.is_super_admin = True
+
+
+def _seed_entry_field_options(db: Session) -> None:
+    """预置品种 A-F；市场不预置，由 fruit_admin 自行维护。"""
+
+    for order, value in enumerate("ABCDEF"):
+        option = (
+            db.query(EntryFieldOption)
+            .filter(
+                EntryFieldOption.field_key == "variety",
+                EntryFieldOption.value == value,
+            )
+            .first()
+        )
+        if option is None:
+            db.add(
+                EntryFieldOption(
+                    field_key="variety",
+                    value=value,
+                    sort_order=order,
+                    is_active=True,
+                )
+            )
+        else:
+            option.sort_order = order
+            option.is_active = True
+
+
+def _seed_field_conversion_rules(db: Session) -> None:
+    """预置默认品种转换规则：BC 展示原文，统计归 C。"""
+
+    rule = (
+        db.query(FieldConversionRule)
+        .filter(
+            FieldConversionRule.field_key == "grade",
+            FieldConversionRule.source_value == "BC",
+        )
+        .first()
+    )
+    if rule is None:
+        db.add(
+            FieldConversionRule(
+                field_key="grade",
+                source_value="BC",
+                target_value="C",
+                sort_order=0,
+                is_active=True,
+                description="BC 界面显示原文，统计统一归入 C",
+            )
+        )
+    else:
+        rule.target_value = "C"
+        rule.sort_order = 0
+        rule.is_active = True
+        rule.description = "BC 界面显示原文，统计统一归入 C"

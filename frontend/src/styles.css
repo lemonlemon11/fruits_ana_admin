@@ -102,6 +102,13 @@ h3 { margin-bottom: 0; font-size: 1.2rem; line-height: 1.4; }
   border-radius: 0;
   box-shadow: none;
 }
+/* 通用列表组件直接放在列表卡片里时，外框由卡片提供，避免两层边框。 */
+.list-card > .data-table {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 0;
+}
 .list-card > .pagination-bar {
   margin: 0;
   padding: .71rem .82rem;
@@ -202,17 +209,26 @@ h3 { margin-bottom: 0; font-size: 1.2rem; line-height: 1.4; }
 .nav-group-label { margin: .82rem 0 .12rem; padding-left: .82rem; color: var(--muted); font-size: .9rem; font-weight: 700; }
 .app-sidebar nav a.nav-secondary { min-height: 2.82rem; color: var(--muted); font-size: 1rem; font-weight: 400; }
 .app-sidebar nav a.nav-secondary.router-link-active { border-color: var(--line-strong); background: var(--surface-soft); color: var(--ink); }
-.app-workspace { min-width: 0; }
-.app-workspace > main { width: min(100%, 1680px); margin: 0 auto; padding: 1.41rem 1.65rem 3.29rem; }
+.app-workspace {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+.app-workspace > main {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  padding: 1.18rem 1rem 3rem;
+}
 .app-footer {
-  width: min(100%, 1680px);
-  margin: 0 auto;
+  width: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: .71rem 1.18rem;
-  padding: .82rem 1.65rem 1.18rem;
+  padding: .82rem 1rem 1.06rem;
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: .9rem;
@@ -233,6 +249,33 @@ h3 { margin-bottom: 0; font-size: 1.2rem; line-height: 1.4; }
   font-weight: 700;
 }
 .app-footer-actions button:hover { border-color: var(--primary); color: var(--primary-dark); }
+
+.wechat-qr-button { position: relative; overflow: visible; }
+.wechat-qr-popover {
+  position: absolute;
+  z-index: 45;
+  bottom: calc(100% + .71rem);
+  left: 50%;
+  width: 10rem;
+  height: 10rem;
+  padding: .4rem;
+  border: 1px solid var(--line);
+  border-radius: .75rem;
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(17, 51, 34, .22);
+  object-fit: cover;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, .35rem);
+  transition: opacity .18s ease, transform .18s ease, visibility .18s ease;
+  pointer-events: none;
+}
+.wechat-qr-button:hover .wechat-qr-popover,
+.wechat-qr-button:focus-visible .wechat-qr-popover {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
 
 @media (min-width: 821px) {
   .app-shell.sidebar-collapsed .app-body { grid-template-columns: 4.24rem minmax(0, 1fr); }
@@ -636,12 +679,64 @@ h3 { margin-bottom: 0; font-size: 1.2rem; line-height: 1.4; }
   .activity-item > span:last-child { grid-column: 2; white-space: normal; }
 }
 
-/* 全局操作反馈 */
-.toast-host { position: fixed; z-index: 80; right: 1.18rem; bottom: 1.18rem; display: grid; width: min(340px, calc(100vw - 2.35rem)); gap: .59rem; pointer-events: none; }
-.toast { padding: .71rem .94rem; border: 1px solid var(--line-strong); border-left: 4px solid var(--primary); border-radius: var(--radius-sm); background: var(--surface); box-shadow: 0 12px 28px rgba(17, 51, 34, .18); color: var(--ink); font-size: .95rem; line-height: 1.55; pointer-events: auto; }
+/* 全局操作反馈：贴右侧边、垂直居中弹出，避开顶部 header 与底部页脚 */
+.toast-host {
+  position: fixed;
+  z-index: 80;
+  top: 50%;
+  right: 1.18rem;
+  display: grid;
+  width: min(340px, calc(100vw - 2.35rem));
+  gap: .59rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: .59rem;
+  padding: .71rem .94rem;
+  border: 1px solid var(--line-strong);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgba(17, 51, 34, .18);
+  color: var(--ink);
+  font-size: .95rem;
+  line-height: 1.55;
+  pointer-events: auto;
+}
+.toast-icon { flex: 0 0 auto; margin-top: .18rem; color: var(--primary); }
+.toast-text { min-width: 0; }
 .toast.success { border-left-color: var(--primary); }
+.toast.success .toast-icon { color: var(--primary); }
 .toast.error { border-left-color: var(--danger); background: #fbebe9; color: #6d2721; }
+.toast.error .toast-icon { color: var(--danger); }
 .toast.info { border-left-color: var(--focus); }
+.toast.info .toast-icon { color: var(--focus); }
+
+/* 从右侧边滑入 / 滑出，避免生硬地闪现 */
+.toast-enter-active {
+  transition: opacity .28s ease, transform .28s cubic-bezier(.22, .61, .36, 1);
+}
+.toast-leave-active {
+  position: absolute;
+  right: 0;
+  width: 100%;
+  transition: opacity .2s ease, transform .2s cubic-bezier(.4, 0, 1, 1);
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(calc(100% + 1.18rem)) scale(.98);
+}
+.toast-move { transition: transform .28s cubic-bezier(.22, .61, .36, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-enter-active,
+  .toast-leave-active,
+  .toast-move { transition-duration: .01ms; }
+}
 .confirm-dialog { width: min(460px, 100%); }
 .confirm-message { margin: 0; color: var(--muted); line-height: 1.7; }
 .empty { display: flex; min-height: 8.24rem; align-items: center; justify-content: center; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--muted); text-align: center; }
@@ -650,8 +745,6 @@ h3 { margin-bottom: 0; font-size: 1.2rem; line-height: 1.4; }
 .grant-layout { display: grid; gap: 1rem; max-height: 58vh; overflow: auto; }
 .grant-section { display: grid; align-content: start; gap: .59rem; }
 .grant-section h3 { padding-bottom: .47rem; border-bottom: 1px solid var(--line); }
-.grant-menu-row { display: flex; min-height: 2.35rem; padding: 0 .47rem; border-radius: var(--radius-sm); }
-.grant-menu-row:hover { background: var(--surface-soft); }
 .grant-group { display: grid; gap: .24rem; padding: .71rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
 .grant-group-head { display: flex; align-items: center; gap: .47rem; }
 .grant-group-head strong { color: var(--primary-dark); }
@@ -778,7 +871,7 @@ h3 { margin-bottom: 0; font-size: 1.2rem; line-height: 1.4; }
   .stat-card-value { font-size: 1.65rem; }
   .dashboard-panel { padding: .82rem; }
   .trend-chart { height: 11.18rem; }
-  .toast-host { right: .59rem; bottom: .59rem; width: calc(100vw - 1.18rem); }
+  .toast-host { right: .59rem; width: calc(100vw - 1.18rem); }
 }
 
 /* 平板与小尺寸笔记本：压缩侧栏和留白，优先保证内容区宽度。 */
@@ -795,10 +888,10 @@ h3 { margin-bottom: 0; font-size: 1.2rem; line-height: 1.4; }
   .toolbar select { min-width: 130px; }
 }
 
-/* 桌面宽屏：放宽侧栏与主内容边距，避免内容拉伸过度。 */
+/* 桌面宽屏：保持侧栏略宽，但收紧主内容左右边距。 */
 @media (min-width: 1441px) {
   .app-body { grid-template-columns: 15.29rem minmax(0, 1fr); }
-  .app-workspace > main { padding-inline: 2.35rem; }
+  .app-workspace > main { padding-inline: 1rem; }
 }
 
 /* 中等宽度下保持看板卡片两列，避免过早堆叠。 */

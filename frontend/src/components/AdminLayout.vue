@@ -2,12 +2,13 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import ArrowUp from '@lucide/vue/dist/esm/icons/arrow-up.mjs'
+import ArrowLeftRight from '@lucide/vue/dist/esm/icons/arrow-left-right.mjs'
 import Bell from '@lucide/vue/dist/esm/icons/bell.mjs'
 import BookOpen from '@lucide/vue/dist/esm/icons/book-open.mjs'
+import ClipboardPen from '@lucide/vue/dist/esm/icons/clipboard-pen.mjs'
 import Clock3 from '@lucide/vue/dist/esm/icons/clock-3.mjs'
 import Database from '@lucide/vue/dist/esm/icons/database.mjs'
 import FolderTree from '@lucide/vue/dist/esm/icons/folder-tree.mjs'
-import Headphones from '@lucide/vue/dist/esm/icons/headphones.mjs'
 import KeyRound from '@lucide/vue/dist/esm/icons/key-round.mjs'
 import LayoutDashboard from '@lucide/vue/dist/esm/icons/layout-dashboard.mjs'
 import LogOut from '@lucide/vue/dist/esm/icons/log-out.mjs'
@@ -41,7 +42,8 @@ function pad(value: number) {
   return String(value).padStart(2, '0')
 }
 
-const adminNav = [
+const canManageEntryFields = computed(() => currentUser.value?.roles.some((role) => role.code === 'fruit_admin') === true)
+const adminNav = computed(() => [
   { path: '/admin/dashboard', label: '工作台', icon: LayoutDashboard },
   { path: '/admin/users', label: '用户管理', icon: Users },
   { path: '/admin/roles', label: '角色管理', icon: ShieldCheck },
@@ -51,10 +53,12 @@ const adminNav = [
   { path: '/admin/data', label: '业务数据', icon: Database },
   { path: '/admin/logs', label: '审计日志', icon: ScrollText },
   { path: '/admin/settings', label: '系统配置', icon: Settings },
-]
+  ...(canManageEntryFields.value ? [{ path: '/admin/entry-fields', label: '录单字段配置', icon: ClipboardPen }] : []),
+  ...(canManageEntryFields.value ? [{ path: '/admin/field-conversions', label: '字段转换配置', icon: ArrowLeftRight }] : []),
+])
 const pinnedTab = { path: '/admin/dashboard', title: '工作台' }
 const openTabs = ref<Array<{ path: string; title: string }>>([{ ...pinnedTab }])
-const adminNavByPath = new Map(adminNav.map((item) => [item.path, item.label]))
+const adminNavByPath = computed(() => new Map(adminNav.value.map((item) => [item.path, item.label])))
 
 const userInitial = computed(() => currentUser.value?.display_name?.slice(0, 1) || 'A')
 const currentNavLabel = computed(() => String(route.meta.title || '管理端'))
@@ -100,7 +104,7 @@ watch(
   () => route.fullPath,
   () => {
     if (!route.path.startsWith('/admin')) return
-    const title = String(route.meta.title || adminNavByPath.get(route.path) || '管理端')
+    const title = String(route.meta.title || adminNavByPath.value.get(route.path) || '管理端')
     const existing = openTabs.value.find((tab) => tab.path === route.path)
     if (!existing) openTabs.value.push({ path: route.path, title })
   },
@@ -148,7 +152,7 @@ function refreshTab(path: string) {
 }
 
 function tabIcon(path: string) {
-  return adminNav.find((item) => item.path === path)?.icon
+  return adminNav.value.find((item) => item.path === path)?.icon
 }
 
 function toggleSidebar() {
@@ -267,9 +271,10 @@ async function handleLogout() {
           <span class="app-footer-copy">SLD-水果市场销售分析系统©2026</span>
           <nav class="app-footer-actions" aria-label="系统服务">
             <button type="button"><BookOpen :size="16" :stroke-width="2" aria-hidden="true" />使用手册</button>
-            <button type="button"><MessageCircle :size="16" :stroke-width="2" aria-hidden="true" />微信公众号</button>
-            <button type="button"><ShieldCheck :size="16" :stroke-width="2" aria-hidden="true" />正版查询</button>
-            <button type="button"><Headphones :size="16" :stroke-width="2" aria-hidden="true" />联系人工客服</button>
+            <button type="button" class="wechat-qr-button">
+              <MessageCircle :size="16" :stroke-width="2" aria-hidden="true" />微信公众号
+              <img class="wechat-qr-popover" src="/gzh.jpg" alt="SLD-水果市场销售分析系统 微信公众号二维码" />
+            </button>
           </nav>
         </footer>
         <div

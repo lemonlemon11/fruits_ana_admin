@@ -5,6 +5,7 @@ import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
 import Eye from '@lucide/vue/dist/esm/icons/eye.mjs'
 import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
+import DataTable, { type DataTableColumn } from '../components/DataTable.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import type { AiCacheItem, DataIssueItem, ImportBatchItem, ListResponse } from '../types'
 
@@ -83,6 +84,38 @@ async function changeTab(next: 'imports' | 'issues' | 'ai') {
   if (next === 'ai') await loadAi()
 }
 
+/** 三个页签各一张表，列固定、操作列走插槽。 */
+const importColumns: DataTableColumn<ImportBatchItem>[] = [
+  { key: 'id', label: 'ID', numeric: true },
+  { key: 'merchant_no', label: '商号', emphasis: true, rowHeader: true, value: (item) => item.merchant_no_normalized || item.merchant_no },
+  { key: 'order_no', label: '单号', value: (item) => item.order_no_normalized || item.order_no || '—' },
+  { key: 'container_no', label: '柜号', value: (item) => item.container_no || '—' },
+  { key: 'file_name', label: '文件', value: (item) => item.file_name || '—' },
+  { key: 'imported_at', label: '导入时间', value: (item) => (item.imported_at ? new Date(item.imported_at).toLocaleString() : '—') },
+  { key: 'status', label: '状态' },
+  { key: 'counts', label: '成功/警告/失败', value: (item) => `${item.success_count} / ${item.warning_count} / ${item.failure_count}` },
+  { key: 'actions', label: '操作' },
+]
+
+const issueColumns: DataTableColumn<DataIssueItem>[] = [
+  { key: 'row_number', label: '行号', numeric: true, value: (item) => item.row_number ?? '—' },
+  { key: 'severity', label: '严重程度' },
+  { key: 'issue_type', label: '问题类型' },
+  { key: 'field_name', label: '字段', value: (item) => item.field_name || '—' },
+  { key: 'message', label: '说明' },
+  { key: 'raw_value', label: '原始值', value: (item) => item.raw_value || '—' },
+]
+
+const aiColumns: DataTableColumn<AiCacheItem>[] = [
+  { key: 'id', label: 'ID', numeric: true },
+  { key: 'feature', label: '功能', emphasis: true, rowHeader: true },
+  { key: 'model', label: '模型' },
+  { key: 'cache_key', label: '缓存键' },
+  { key: 'created_at', label: '生成时间', value: (item) => (item.created_at ? new Date(item.created_at).toLocaleString() : '—') },
+  { key: 'content', label: '内容' },
+  { key: 'actions', label: '操作' },
+]
+
 onMounted(loadImports)
 </script>
 
@@ -108,44 +141,30 @@ onMounted(loadImports)
           <button class="secondary-button" @click="page = 1; loadImports()">查询</button>
         </div>
         <p v-if="error" class="error">{{ error }}</p>
-        <div class="table-wrap">
-        <table class="table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>商号</th>
-            <th>单号</th>
-            <th>柜号</th>
-            <th>文件</th>
-            <th>导入时间</th>
-            <th>状态</th>
-            <th>成功/警告/失败</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in imports" :key="item.id">
-            <td>{{ item.id }}</td>
-            <td>{{ item.merchant_no_normalized || item.merchant_no }}</td>
-            <td>{{ item.order_no_normalized || item.order_no || '—' }}</td>
-            <td>{{ item.container_no || '—' }}</td>
-            <td>{{ item.file_name || '—' }}</td>
-            <td>{{ item.imported_at ? new Date(item.imported_at).toLocaleString() : '—' }}</td>
-            <td><span class="tag" :class="item.status">{{ item.status }}</span></td>
-            <td>{{ item.success_count }} / {{ item.warning_count }} / {{ item.failure_count }}</td>
-            <td><button class="table-action" @click="showIssues(item)"><Eye :size="15" :stroke-width="2" aria-hidden="true" />查看问题</button></td>
-          </tr>
-        </tbody>
-      </table>
-        </div>
-        <div class="empty-state" v-if="!loading && !imports.length">暂无导入批次</div>
-        <PaginationBar
-          v-model:page="page"
-          v-model:page-size="pageSize"
-          :total="importTotal"
-          :page-size-options="[10, 20, 50, 100]"
-          @change="loadImports"
-        />
+        <DataTable
+          :columns="importColumns"
+          :rows="imports"
+          :row-key="(item) => item.id"
+          caption="导入批次列表"
+          min-width="1080px"
+          :empty-text="loading ? '正在加载…' : '暂无导入批次'"
+        >
+          <template #cell-status="{ row }">
+            <span class="tag" :class="row.status">{{ row.status }}</span>
+          </template>
+          <template #cell-actions="{ row }">
+            <button class="table-action" @click="showIssues(row)"><Eye :size="15" :stroke-width="2" aria-hidden="true" />查看问题</button>
+          </template>
+          <template #footer>
+            <PaginationBar
+              v-model:page="page"
+              v-model:page-size="pageSize"
+              :total="importTotal"
+              :page-size-options="[10, 20, 50, 100]"
+              @change="loadImports"
+            />
+          </template>
+        </DataTable>
       </div>
     </div>
 
@@ -154,67 +173,46 @@ onMounted(loadImports)
         <span>当前批次：{{ selectedBatch?.merchant_no_normalized || selectedBatch?.merchant_no }}</span>
         <span>共 {{ issueTotal }} 条问题</span>
       </div>
-      <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>行号</th>
-            <th>严重程度</th>
-            <th>问题类型</th>
-            <th>字段</th>
-            <th>说明</th>
-            <th>原始值</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in issues" :key="item.id">
-            <td>{{ item.row_number ?? '—' }}</td>
-            <td><span class="tag" :class="item.severity === 'error' ? 'danger' : 'warning'">{{ item.severity }}</span></td>
-            <td>{{ item.issue_type }}</td>
-            <td>{{ item.field_name || '—' }}</td>
-            <td>{{ item.message }}</td>
-            <td>{{ item.raw_value || '—' }}</td>
-          </tr>
-        </tbody>
-      </table>
-      </div>
-      <div class="empty-state" v-if="!issues.length">该批次暂无数据问题</div>
+      <DataTable
+        :columns="issueColumns"
+        :rows="issues"
+        :row-key="(item) => item.id"
+        caption="该批次的数据问题明细"
+        min-width="900px"
+        bordered
+        empty-text="该批次暂无数据问题"
+      >
+        <template #cell-severity="{ row }">
+          <span class="tag" :class="row.severity === 'error' ? 'danger' : 'warning'">{{ row.severity }}</span>
+        </template>
+      </DataTable>
     </div>
 
     <div v-if="tab === 'ai'">
-      <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>功能</th>
-            <th>模型</th>
-            <th>缓存键</th>
-            <th>生成时间</th>
-            <th>内容</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in aiItems" :key="item.id">
-            <td>{{ item.id }}</td>
-            <td>{{ item.feature }}</td>
-            <td>{{ item.model }}</td>
-            <td><code>{{ item.cache_key }}</code></td>
-            <td>{{ item.created_at ? new Date(item.created_at).toLocaleString() : '—' }}</td>
-            <td style="max-width: 360px">{{ item.content }}</td>
-            <td>
-              <button v-if="hasPermission('admin:data:refresh-cache')" class="table-action danger" :disabled="busyId === item.id" @click="deleteAi(item)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      </div>
-      <div class="empty-state" v-if="!aiItems.length">暂无 AI 缓存</div>
+      <DataTable
+        :columns="aiColumns"
+        :rows="aiItems"
+        :row-key="(item) => item.id"
+        caption="AI 分析缓存列表"
+        min-width="980px"
+        empty-text="暂无 AI 缓存"
+      >
+        <template #cell-cache_key="{ row }">
+          <code>{{ row.cache_key }}</code>
+        </template>
+        <template #cell-content="{ row }">
+          <span class="ai-cache-content">{{ row.content }}</span>
+        </template>
+        <template #cell-actions="{ row }">
+          <button v-if="hasPermission('admin:data:refresh-cache')" class="table-action danger" :disabled="busyId === row.id" @click="deleteAi(row)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
+        </template>
+      </DataTable>
     </div>
   </section>
 </template>
 
 <style scoped>
 .danger-text { color: var(--danger); }
+/* 缓存内容是长文本，收窄列宽并在单元格内折行，避免整张表被撑开。 */
+.ai-cache-content { display: block; max-width: 22rem; overflow-wrap: anywhere; }
 </style>

@@ -11,6 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api.auth import router as auth_router
 from .api.dashboard import router as dashboard_router
 from .api.data import router as data_router
+from .api.entry_field_options import router as entry_field_options_router
+from .api.field_conversion_rules import router as field_conversion_rules_router
 from .api.logs import router as logs_router
 from .api.menus import router as menus_router
 from .api.notifications import router as notifications_router
@@ -58,6 +60,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(users_router)
+app.include_router(entry_field_options_router)
+app.include_router(field_conversion_rules_router)
 app.include_router(roles_router)
 app.include_router(menus_router)
 app.include_router(permissions_router)

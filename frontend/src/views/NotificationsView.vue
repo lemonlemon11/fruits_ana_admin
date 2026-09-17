@@ -7,6 +7,7 @@ import { useEscapeClose } from '../composables/useEscapeClose'
 import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
 import Send from '@lucide/vue/dist/esm/icons/send.mjs'
 import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
+import DataTable, { type DataTableColumn } from '../components/DataTable.vue'
 import RichTextEditor from '../components/RichTextEditor.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import { notificationPlainText, sanitizeNotificationHtml } from '../notificationHtml'
@@ -15,7 +16,7 @@ import type { ListResponse, NotificationItem, RoleItem, UserItem } from '../type
 const items = ref<NotificationItem[]>([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(10)
 const keyword = ref('')
 const typeFilter = ref('')
 const priorityFilter = ref('')
@@ -40,6 +41,27 @@ const form = reactive({
   publish_at: '',
   expire_at: '',
 })
+
+/** 通知列表列固定，标题 / 类型 / 优先级 / 状态 / 操作走插槽渲染。 */
+const columns: DataTableColumn<NotificationItem>[] = [
+  { key: 'id', label: 'ID', numeric: true },
+  { key: 'title', label: '标题', emphasis: true, rowHeader: true },
+  { key: 'notification_type', label: '类型' },
+  { key: 'priority', label: '优先级' },
+  { key: 'target', label: '范围' },
+  { key: 'read', label: '阅读进度' },
+  { key: 'is_published', label: '状态' },
+  { key: 'publish_at', label: '发布时间', value: (item) => (item.publish_at ? new Date(item.publish_at).toLocaleString() : '—') },
+  { key: 'actions', label: '操作' },
+]
+
+const targetLabel = (item: NotificationItem) => {
+  if (item.target_type === 'all') return '全部用户'
+  if (item.target_type === 'role') return `${item.target_role_ids.length} 个角色`
+  return `${item.target_user_ids.length} 个用户`
+}
+
+const priorityTone = (priority: string) => (priority === 'normal' ? '' : priority === 'important' ? 'warning' : 'danger')
 
 useEscapeClose(() => showModal.value, () => {
   showModal.value = false
@@ -231,51 +253,49 @@ onMounted(async () => {
 
     <p v-if="error" class="error">{{ error }}</p>
 
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>标题</th>
-            <th>类型</th>
-            <th>优先级</th>
-            <th>范围</th>
-            <th>阅读进度</th>
-            <th>状态</th>
-            <th>发布时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in items" :key="item.id">
-            <td>{{ item.id }}</td>
-            <td class="notification-title-cell">{{ item.title }}</td>
-            <td><span class="tag">{{ typeLabels[item.notification_type] || item.notification_type }}</span></td>
-            <td><span class="tag" :class="item.priority === 'normal' ? '' : item.priority === 'important' ? 'warning' : 'danger'">{{ priorityLabels[item.priority] }}</span></td>
-            <td>{{ item.target_type === 'all' ? '全部用户' : item.target_type === 'role' ? `${item.target_role_ids.length} 个角色` : `${item.target_user_ids.length} 个用户` }}</td>
-            <td>{{ item.read_count }} / {{ item.recipient_total }}</td>
-            <td><span class="tag" :class="item.is_published ? 'success' : ''">{{ item.is_published ? '已发布' : '草稿' }}</span></td>
-            <td>{{ item.publish_at ? new Date(item.publish_at).toLocaleString() : '—' }}</td>
-            <td>
-              <div class="table-actions">
-                <button v-if="!item.is_published && hasPermission('admin:notification:publish')" class="table-action" :disabled="busyId === item.id" @click="publish(item)"><Send :size="15" :stroke-width="2" aria-hidden="true" />发布</button>
-                <button v-if="hasPermission('admin:notification:update')" class="table-action" :disabled="busyId === item.id" @click="openEdit(item)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
-                <button v-if="hasPermission('admin:notification:delete')" class="table-action danger" :disabled="busyId === item.id" @click="removeItem(item)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div v-if="!loading && !items.length" class="empty-state">暂无通知</div>
-
-      <PaginationBar
-        v-model:page="page"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="[10, 20, 50, 100]"
-        @change="load"
-      />
+    <DataTable
+      :columns="columns"
+      :rows="items"
+      :row-key="(item) => item.id"
+      caption="管理端通知列表"
+      min-width="1080px"
+      :empty-text="loading ? '正在加载…' : '暂无通知'"
+    >
+      <template #cell-title="{ row }">
+        <span class="notification-title-cell">{{ row.title }}</span>
+      </template>
+      <template #cell-notification_type="{ row }">
+        <span class="tag">{{ typeLabels[row.notification_type] || row.notification_type }}</span>
+      </template>
+      <template #cell-priority="{ row }">
+        <span class="tag" :class="priorityTone(row.priority)">{{ priorityLabels[row.priority] }}</span>
+      </template>
+      <template #cell-target="{ row }">
+        {{ targetLabel(row) }}
+      </template>
+      <template #cell-read="{ row }">
+        {{ row.read_count }} / {{ row.recipient_total }}
+      </template>
+      <template #cell-is_published="{ row }">
+        <span class="tag" :class="row.is_published ? 'success' : ''">{{ row.is_published ? '已发布' : '草稿' }}</span>
+      </template>
+      <template #cell-actions="{ row }">
+        <div class="table-actions">
+          <button v-if="!row.is_published && hasPermission('admin:notification:publish')" class="table-action" :disabled="busyId === row.id" @click="publish(row)"><Send :size="15" :stroke-width="2" aria-hidden="true" />发布</button>
+          <button v-if="hasPermission('admin:notification:update')" class="table-action" :disabled="busyId === row.id" @click="openEdit(row)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
+          <button v-if="hasPermission('admin:notification:delete')" class="table-action danger" :disabled="busyId === row.id" @click="removeItem(row)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
+        </div>
+      </template>
+      <template #footer>
+        <PaginationBar
+          v-model:page="page"
+          v-model:page-size="pageSize"
+          :total="total"
+          :page-size-options="[10, 20, 50, 100]"
+          @change="load"
+        />
+      </template>
+    </DataTable>
     </div>
 
     <div v-if="showModal" class="drawer-mask" @click.self="showModal = false">
@@ -363,6 +383,7 @@ onMounted(async () => {
   gap: 1rem;
 }
 .notification-title-cell {
+  display: inline-block;
   max-width: 18rem;
   overflow: hidden;
   text-overflow: ellipsis;

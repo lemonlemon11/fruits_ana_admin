@@ -4,6 +4,7 @@ import { del, get, patch, post } from '../api/client'
 import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
 import { useEscapeClose } from '../composables/useEscapeClose'
+import DataTable, { type DataTableColumn } from '../components/DataTable.vue'
 import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
 import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
 import type { ListResponse, PermissionItem } from '../types'
@@ -24,6 +25,18 @@ const form = reactive({
   description: '',
   is_active: true,
 })
+
+/** 权限点列表列固定，编码 / 状态 / 操作走插槽渲染。 */
+const columns: DataTableColumn<PermissionItem>[] = [
+  { key: 'id', label: 'ID', numeric: true },
+  { key: 'code', label: '编码', emphasis: true, rowHeader: true },
+  { key: 'name', label: '名称' },
+  { key: 'module', label: '模块' },
+  { key: 'permission_type', label: '类型' },
+  { key: 'is_active', label: '状态' },
+  { key: 'description', label: '说明', value: (item) => item.description || '—' },
+  { key: 'actions', label: '操作' },
+]
 
 useEscapeClose(() => showModal.value, () => {
   showModal.value = false
@@ -136,40 +149,27 @@ onMounted(load)
 
     <p v-if="error" class="error">{{ error }}</p>
 
-    <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>编码</th>
-          <th>名称</th>
-          <th>模块</th>
-          <th>类型</th>
-          <th>状态</th>
-          <th>说明</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="item in items" :key="item.id">
-          <td>{{ item.id }}</td>
-          <td><code>{{ item.code }}</code></td>
-          <td>{{ item.name }}</td>
-          <td>{{ item.module }}</td>
-          <td>{{ item.permission_type }}</td>
-          <td><span class="tag" :class="item.is_active ? 'success' : 'danger'">{{ item.is_active ? '启用' : '停用' }}</span></td>
-          <td>{{ item.description || '—' }}</td>
-          <td>
-            <div class="table-actions">
-              <button v-if="hasPermission('admin:permission:update')" class="table-action" :disabled="busyId === item.id" @click="openEdit(item)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
-              <button v-if="hasPermission('admin:permission:delete')" class="table-action danger" :disabled="busyId === item.id" @click="removePermission(item)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-    </div>
-      <div class="empty-state" v-if="!items.length">暂无权限点</div>
+    <DataTable
+      :columns="columns"
+      :rows="items"
+      :row-key="(item) => item.id"
+      caption="管理端权限点列表"
+      min-width="900px"
+      empty-text="暂无权限点"
+    >
+      <template #cell-code="{ row }">
+        <code>{{ row.code }}</code>
+      </template>
+      <template #cell-is_active="{ row }">
+        <span class="tag" :class="row.is_active ? 'success' : 'danger'">{{ row.is_active ? '启用' : '停用' }}</span>
+      </template>
+      <template #cell-actions="{ row }">
+        <div class="table-actions">
+          <button v-if="hasPermission('admin:permission:update')" class="table-action" :disabled="busyId === row.id" @click="openEdit(row)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
+          <button v-if="hasPermission('admin:permission:delete')" class="table-action danger" :disabled="busyId === row.id" @click="removePermission(row)"><Trash2 :size="15" :stroke-width="2" aria-hidden="true" />删除</button>
+        </div>
+      </template>
+    </DataTable>
     </div>
 
     <div v-if="showModal" class="drawer-mask" @click.self="showModal = false">

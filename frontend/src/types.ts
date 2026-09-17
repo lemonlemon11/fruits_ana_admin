@@ -189,3 +189,35 @@ export type OperationLogItem = {
   user_agent: string | null
   created_at: string
 }
+
+export type EntryFieldOption = {
+  id: number
+  field_key: 'market' | 'variety'
+  value: string
+  sort_order: number
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type EntryFieldOptionList = {
+  items: EntryFieldOption[]
+  total: number
+}
+
+export type FieldConversionRule = {
+  id: number
+  field_key: 'grade'
+  source_value: string
+  target_value: string
+  sort_order: number
+  is_active: boolean
+  description: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type FieldConversionRuleList = {
+  items: FieldConversionRule[]
+  total: number
+}

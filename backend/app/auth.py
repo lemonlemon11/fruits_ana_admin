@@ -236,6 +236,19 @@ def require_permission(permission_code: str) -> Callable:
     return dependency
 
 
+def require_fruit_admin(
+    request: Request,
+    current_user: User = Depends(require_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """只允许业务角色 ``fruit_admin`` 维护录单字段。"""
+
+    roles = get_roles_for_user(db, current_user.id)
+    if not any(role.code == "fruit_admin" and role.is_active for role in roles):
+        raise HTTPException(status_code=403, detail="仅水果系统管理员可配置录单字段")
+    return current_user
+
+
 def client_ip(request: Request) -> str | None:
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:

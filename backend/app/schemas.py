@@ -325,3 +325,75 @@ class DashboardStats(BaseModel):
     latest_import_at: str | None
     grade_distribution: list[DashboardDistributionItem]
     fruit_type_distribution: list[DashboardDistributionItem]
+
+
+class EntryFieldOptionCreate(BaseModel):
+    field_key: str = Field(pattern=r"^(market|variety)$")
+    value: str = Field(min_length=1, max_length=64)
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class EntryFieldOptionUpdate(BaseModel):
+    value: str | None = Field(default=None, min_length=1, max_length=64)
+    sort_order: int | None = None
+    is_active: bool | None = None
+
+
+class EntryFieldOptionReorder(BaseModel):
+    field_key: str = Field(pattern=r"^(market|variety)$")
+    item_ids: list[int] = Field(min_length=1)
+
+
+class EntryFieldOptionRead(ORMModel):
+    id: int
+    field_key: str
+    value: str
+    sort_order: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class EntryFieldOptionListResponse(BaseModel):
+    items: list[EntryFieldOptionRead]
+    total: int
+
+
+class FieldConversionRuleCreate(BaseModel):
+    field_key: str = Field(pattern=r"^(grade)$")
+    source_value: str = Field(min_length=1, max_length=64)
+    target_value: str = Field(min_length=1, max_length=64)
+    sort_order: int = 0
+    is_active: bool = True
+    description: str | None = Field(default=None, max_length=255)
+
+
+class FieldConversionRuleUpdate(BaseModel):
+    source_value: str | None = Field(default=None, min_length=1, max_length=64)
+    target_value: str | None = Field(default=None, min_length=1, max_length=64)
+    sort_order: int | None = None
+    is_active: bool | None = None
+    description: str | None = Field(default=None, max_length=255)
+
+
+class FieldConversionRuleReorder(BaseModel):
+    field_key: str = Field(pattern=r"^(grade)$")
+    item_ids: list[int] = Field(min_length=1)
+
+
+class FieldConversionRuleRead(ORMModel):
+    id: int
+    field_key: str
+    source_value: str
+    target_value: str
+    sort_order: int
+    is_active: bool
+    description: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class FieldConversionRuleListResponse(BaseModel):
+    items: list[FieldConversionRuleRead]
+    total: int
