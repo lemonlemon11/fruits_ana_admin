@@ -130,14 +130,14 @@ onMounted(loadImports)
     <div v-if="tab === 'imports'">
       <div class="list-card">
         <div class="toolbar">
-          <input v-model="keyword" class="input" style="max-width: 220px" placeholder="商号、单号或文件名" @keyup.enter="page = 1; loadImports()" />
-          <select v-model="status" class="select" style="max-width: 160px" @change="page = 1; loadImports()">
+          <label style="max-width: 240px"><span>搜索</span><input v-model="keyword" class="input" placeholder="商号、单号或文件名" @keyup.enter="page = 1; loadImports()" /></label>
+          <label style="max-width: 160px"><span>状态</span><select v-model="status" class="select" @change="page = 1; loadImports()">
             <option value="">全部状态</option>
             <option value="success">成功</option>
             <option value="conflict">冲突</option>
             <option value="pending">待处理</option>
             <option value="failed">失败</option>
-          </select>
+          </select></label>
           <button class="secondary-button" @click="page = 1; loadImports()">查询</button>
         </div>
         <p v-if="error" class="error">{{ error }}</p>

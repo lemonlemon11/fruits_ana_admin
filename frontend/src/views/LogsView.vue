@@ -100,20 +100,20 @@ onMounted(loadOperations)
 
     <div class="list-card">
       <div class="toolbar">
-        <input v-model="username" class="input" style="max-width: 220px" placeholder="用户名" @keyup.enter="page = 1; tab === 'operation' ? loadOperations() : loadLogin()" />
-        <select v-if="tab === 'operation'" v-model="moduleFilter" class="select" style="max-width: 160px" @change="page = 1; loadOperations()">
+        <label style="max-width: 220px"><span>用户名</span><input v-model="username" class="input" placeholder="用户名" @keyup.enter="page = 1; tab === 'operation' ? loadOperations() : loadLogin()" /></label>
+        <label v-if="tab === 'operation'" style="max-width: 160px"><span>模块</span><select v-model="moduleFilter" class="select" @change="page = 1; loadOperations()">
           <option value="">全部模块</option>
           <option value="user">user</option>
           <option value="role">role</option>
           <option value="menu">menu</option>
           <option value="permission">permission</option>
           <option value="config">config</option>
-        </select>
-        <select v-if="tab === 'login'" v-model="successFilter" class="select" style="max-width: 140px" @change="page = 1; loadLogin()">
+        </select></label>
+        <label v-if="tab === 'login'" style="max-width: 140px"><span>结果</span><select v-model="successFilter" class="select" @change="page = 1; loadLogin()">
           <option value="">全部结果</option>
           <option value="true">成功</option>
           <option value="false">失败</option>
-        </select>
+        </select></label>
         <button class="secondary-button" @click="page = 1; tab === 'operation' ? loadOperations() : loadLogin()">查询</button>
         <button v-if="hasPermission('admin:log:export') && tab === 'operation'" class="secondary-button" @click="exportCsv('/api/admin/logs/operations.csv')">
           <Download :size="16" :stroke-width="2" aria-hidden="true" />

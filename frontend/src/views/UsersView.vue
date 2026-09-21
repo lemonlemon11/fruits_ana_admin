@@ -212,16 +212,16 @@ onMounted(async () => {
   <section class="page-stack">
     <div class="list-card">
       <div class="toolbar">
-        <input v-model="keyword" class="input" style="max-width: 220px" placeholder="搜索用户名" @keyup.enter="page = 1; load()" />
-        <select v-model="roleFilter" class="select" style="max-width: 180px" @change="page = 1; load()">
+        <label style="max-width: 220px"><span>搜索用户名</span><input v-model="keyword" class="input" placeholder="用户名或邮箱" @keyup.enter="page = 1; load()" /></label>
+        <label style="max-width: 180px"><span>角色</span><select v-model="roleFilter" class="select" @change="page = 1; load()">
           <option value="">全部角色</option>
           <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
-        </select>
-        <select v-model="activeFilter" class="select" style="max-width: 140px" @change="page = 1; load()">
+        </select></label>
+        <label style="max-width: 140px"><span>状态</span><select v-model="activeFilter" class="select" @change="page = 1; load()">
           <option value="">全部状态</option>
           <option value="true">启用</option>
           <option value="false">禁用</option>
-        </select>
+        </select></label>
         <button class="secondary-button" @click="page = 1; load()">查询</button>
         <button v-if="hasPermission('admin:user:create')" class="primary-button toolbar-action" @click="openCreate">新增用户</button>
       </div>
