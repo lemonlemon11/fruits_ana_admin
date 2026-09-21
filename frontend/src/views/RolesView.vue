@@ -5,11 +5,12 @@ import { confirmAction, notify } from '../feedback'
 import { hasPermission } from '../auth'
 import DataTable, { type DataTableColumn } from '../components/DataTable.vue'
 import GrantMenuTreeNode from '../components/GrantMenuTreeNode.vue'
+import GrantPermissionTreeNode, { type GrantPermissionNode } from '../components/GrantPermissionTreeNode.vue'
 import { useEscapeClose } from '../composables/useEscapeClose'
 import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
 import ShieldCheck from '@lucide/vue/dist/esm/icons/shield-check.mjs'
 import Trash2 from '@lucide/vue/dist/esm/icons/trash.mjs'
-import type { ListResponse, MenuNode, PermissionItem, RoleItem } from '../types'
+import type { ListResponse, MenuNode, PermissionItem, RoleItem, UserItem } from '../types'
 
 const roles = ref<RoleItem[]>([])
 const menus = ref<MenuNode[]>([])
@@ -22,6 +23,11 @@ const showGrantModal = ref(false)
 const grantRole = ref<RoleItem | null>(null)
 const selectedMenuIds = ref<number[]>([])
 const selectedPermissionIds = ref<number[]>([])
+const showUsersModal = ref(false)
+const usersRole = ref<RoleItem | null>(null)
+const roleUsers = ref<UserItem[]>([])
+const loadingRoleUsers = ref(false)
+const usersError = ref('')
 const saving = ref(false)
 const busyRoleId = ref<number | null>(null)
 const metaError = ref('')
@@ -47,6 +53,9 @@ useEscapeClose(() => showGrantModal.value, () => {
 useEscapeClose(() => !showGrantModal.value && showModal.value, () => {
   showModal.value = false
 })
+useEscapeClose(() => !showGrantModal.value && !showModal.value && showUsersModal.value, () => {
+  showUsersModal.value = false
+})
 
 async function load() {
   error.value = ''
@@ -62,7 +71,7 @@ async function loadMeta() {
   try {
     const [menuData, permissionData] = await Promise.all([
       get<{ items: MenuNode[] }>('/api/admin/menus/tree'),
-      get<ListResponse<PermissionItem>>('/api/admin/permissions'),
+      get<ListResponse<PermissionItem>>('/api/admin/permissions?scope=business'),
     ])
     menus.value = menuData.items
     permissions.value = permissionData.items
@@ -89,6 +98,22 @@ function openEdit(role: RoleItem) {
   form.description = role.description || ''
   form.is_active = role.is_active
   showModal.value = true
+}
+
+async function openRoleUsers(role: RoleItem) {
+  usersRole.value = role
+  roleUsers.value = []
+  usersError.value = ''
+  loadingRoleUsers.value = true
+  showUsersModal.value = true
+  try {
+    const data = await get<ListResponse<UserItem>>(`/api/admin/roles/${role.id}/users`)
+    roleUsers.value = data.items
+  } catch (err) {
+    usersError.value = err instanceof Error ? err.message : '用户列表加载失败'
+  } finally {
+    loadingRoleUsers.value = false
+  }
 }
 
 async function save() {
@@ -134,7 +159,9 @@ async function openGrant(role: RoleItem) {
     grantRole.value = role
     grantTab.value = 'menu'
     selectedMenuIds.value = [...(role.menu_ids || [])]
-    selectedPermissionIds.value = [...(role.permission_ids || [])]
+    selectedPermissionIds.value = (role.permission_ids || []).filter((id) =>
+      permissions.value.some((permission) => permission.id === id),
+    )
     showGrantModal.value = true
   } catch (err) {
     notify(err instanceof Error ? err.message : '打开授权面板失败', 'error')
@@ -157,27 +184,20 @@ async function saveGrant() {
     showGrantModal.value = false
     await load()
   } catch (err) {
-    notify(err instanceof Error ? err.message : '授权保存失败', 'error')
+    notify(err instanceof Error ? err.message : '保存授权失败', 'error')
   } finally {
     saving.value = false
   }
 }
 
 async function removeRole(role: RoleItem) {
-  const ok = await confirmAction(`确认删除角色 ${role.name}？该角色下的用户将失去对应权限。`, {
-    title: '删除角色',
-    confirmText: '删除',
-  })
-  if (!ok) return
-  busyRoleId.value = role.id
+  if (!await confirmAction(`确定要删除角色「${role.name}」吗？`)) return
   try {
     await del(`/api/admin/roles/${role.id}`)
     notify('角色已删除')
     await load()
   } catch (err) {
     notify(err instanceof Error ? err.message : '删除失败', 'error')
-  } finally {
-    busyRoleId.value = null
   }
 }
 
@@ -209,22 +229,138 @@ function toggleMenu(node: MenuNode) {
     : Array.from(new Set([...selectedMenuIds.value, ...ids]))
 }
 
-const permissionGroups = computed(() => {
-  const groups = new Map<string, PermissionItem[]>()
-  for (const permission of permissions.value) {
-    const key = permission.module
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key)!.push(permission)
+function togglePermissionIds(permissionIds: number[]) {
+  if (permissionIds.length === 0) return
+  const allSelected = permissionIds.every((id) => selectedPermissionIds.value.includes(id))
+  selectedPermissionIds.value = allSelected
+    ? selectedPermissionIds.value.filter((id) => !permissionIds.includes(id))
+    : Array.from(new Set([...selectedPermissionIds.value, ...permissionIds]))
+}
+
+/**
+ * 基于菜单树构建权限树。
+ *
+ * 遍历菜单树，为每个菜单节点附加其 permission_code 对应的权限点，
+ * 以及该节点下无关联菜单的游离权限（module 匹配菜单 key）。
+ * 最终产出树状 GrantPermissionNode[]，让权限点展示在所属菜单下。
+ */
+/**
+ * 基于菜单树构建权限树。
+ *
+ * 菜单/目录节点只做分组容器，不带勾选框；
+ * 权限点全作为叶子节点挂在所属菜单下。
+ * 未关联菜单的游离权限按 module 分组独立展示。
+ */
+
+const permissionTree = computed(() => {
+  const permMap = new Map<string, PermissionItem>()
+  for (const p of permissions.value) {
+    permMap.set(p.code, p)
   }
-  return Array.from(groups.entries()).map(([module, items]) => ({ module, items }))
+
+  // 从 permission_code 提取模块前缀（"settlement:list" -> "settlement"）
+  function codePrefix(code: string): string {
+    const idx = code.indexOf(':')
+    return idx > 0 ? code.substring(0, idx) : code
+  }
+
+  // 构建 module → 主菜单的映射（取第一个匹配的菜单）
+  // 用于 action 权限（import:upload、entry:create 等）归到对应菜单下
+  const moduleMenuMap = new Map<string, MenuNode>()
+  function walkModule(nodes: MenuNode[]) {
+    for (const menu of nodes) {
+      if (menu.permission_code) {
+        const prefix = codePrefix(menu.permission_code)
+        if (!moduleMenuMap.has(prefix)) moduleMenuMap.set(prefix, menu)
+      }
+      if (menu.children?.length) walkModule(menu.children)
+    }
+  }
+  walkModule(menus.value)
+
+  // 记录已分配的权限 ID
+  const assigned = new Set<number>()
+
+  function buildTree(menuNodes: MenuNode[]): GrantPermissionNode[] {
+    const result: GrantPermissionNode[] = []
+    for (const menu of menuNodes) {
+      const permChildren: GrantPermissionNode[] = []
+
+      // 1) permission_code 精确匹配（菜单的主权限点）
+      if (menu.permission_code) {
+        const perm = permMap.get(menu.permission_code)
+        if (perm) {
+          assigned.add(perm.id)
+          permChildren.push({
+            key: `perm:${perm.id}`,
+            name: perm.name,
+            codeDescription: perm.code,
+            nodeType: 'permission',
+            permissionIds: [perm.id],
+            children: [],
+          })
+        }
+      }
+
+      // 2) 同模块的 action 权限（按 module 字段匹配）
+      const prefix = menu.permission_code ? codePrefix(menu.permission_code) : ''
+      if (prefix) {
+        for (const p of permissions.value) {
+          if (!assigned.has(p.id) && p.module === prefix) {
+            assigned.add(p.id)
+            permChildren.push({
+              key: `perm:${p.id}`,
+              name: p.name,
+              codeDescription: p.code,
+              nodeType: 'permission',
+              permissionIds: [p.id],
+              children: [],
+            })
+          }
+        }
+      }
+
+      // 递归子菜单
+      const subMenus = buildTree(menu.children || [])
+
+      // 没有内容的节点不展示
+      if (permChildren.length === 0 && subMenus.length === 0) continue
+
+      result.push({
+        key: `menu:${menu.id}`,
+        name: menu.name,
+        nodeType: menu.menu_type === 'directory' ? 'directory' : 'menu',
+        permissionIds: [],
+        children: [...subMenus, ...permChildren],
+      })
+    }
+    return result
+  }
+
+  const tree = buildTree(menus.value)
+
+  // 未匹配到任何菜单的权限（如 module 不在菜单中的）
+  const unassigned = permissions.value.filter((p) => !assigned.has(p.id))
+  if (unassigned.length > 0) {
+    tree.push({
+      key: 'other',
+      name: '其他权限',
+      nodeType: 'directory',
+      permissionIds: [],
+      children: unassigned.map((p) => ({
+        key: `perm:${p.id}`,
+        name: p.name,
+        codeDescription: p.code,
+        nodeType: 'permission',
+        permissionIds: [p.id],
+        children: [],
+      })),
+    })
+  }
+
+  return tree
 })
 
-function togglePermissionGroup(module: string, checked: boolean) {
-  const ids = permissions.value.filter((item) => item.module === module).map((item) => item.id)
-  selectedPermissionIds.value = checked
-    ? Array.from(new Set([...selectedPermissionIds.value, ...ids]))
-    : selectedPermissionIds.value.filter((id) => !ids.includes(id))
-}
 
 onMounted(async () => {
   await Promise.all([load(), loadMeta()])
@@ -253,6 +389,11 @@ onMounted(async () => {
       </template>
       <template #cell-is_active="{ row }">
         <span class="tag" :class="row.is_active ? 'success' : 'danger'">{{ row.is_active ? '启用' : '停用' }}</span>
+      </template>
+      <template #cell-user_count="{ row }">
+        <button class="table-action" type="button" :disabled="row.user_count === 0" @click="openRoleUsers(row)">
+          {{ row.user_count }}
+        </button>
       </template>
       <template #cell-actions="{ row }">
         <div class="table-actions">
@@ -334,18 +475,25 @@ onMounted(async () => {
               </div>
             </section>
             <section v-else class="grant-section">
-              <div v-for="group in permissionGroups" :key="group.module" class="grant-group">
-                <div class="grant-group-head">
-                  <strong>{{ group.module }}</strong>
-                  <button class="text-button" @click="togglePermissionGroup(group.module, true)">全选</button>
-                  <button class="text-button" @click="togglePermissionGroup(group.module, false)">清空</button>
+              <div class="card menu-tree">
+                <div class="menu-tree-toolbar">
+                  <div class="grant-toolbar-head">
+                    <span class="toolbar-summary">权限树</span>
+                    <span class="grant-tree-hint">按菜单结构展示，勾选父级会同时勾选其下所有权限</span>
+                  </div>
+                  <div class="grant-toolbar-actions">
+                    <button class="text-button" @click="selectedPermissionIds = permissions.map((p) => p.id)">全选</button>
+                    <button class="text-button" @click="selectedPermissionIds = []">清空</button>
+                  </div>
                 </div>
-                <div class="grant-group-body">
-                  <label v-for="permission in group.items" :key="permission.id" class="checkbox-row">
-                    <input v-model="selectedPermissionIds" type="checkbox" :value="permission.id" />
-                    <span><code>{{ permission.code }}</code> · {{ permission.name }}</span>
-                  </label>
-                </div>
+                <GrantPermissionTreeNode
+                  v-for="node in permissionTree"
+                  :key="node.key"
+                  :node="node"
+                  :selected="selectedPermissionIds"
+                  @toggle="togglePermissionIds"
+                />
+                <div v-if="!permissionTree.length" class="empty-state">暂无权限点</div>
               </div>
             </section>
           </div>
@@ -353,6 +501,31 @@ onMounted(async () => {
         <div class="drawer-actions">
           <button class="secondary-button" @click="showGrantModal = false">取消</button>
           <button class="primary-button" :disabled="saving" @click="saveGrant">{{ saving ? '保存中...' : '保存授权' }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showUsersModal && usersRole" class="drawer-mask" @click.self="showUsersModal = false">
+      <div class="drawer" role="dialog" aria-modal="true" aria-label="查看角色用户">
+        <div class="drawer-header">
+          <div class="drawer-title">角色用户：{{ usersRole.name }}</div>
+          <button class="link-button" @click="showUsersModal = false">关闭</button>
+        </div>
+        <div class="drawer-body">
+          <p v-if="usersError" class="error">{{ usersError }}</p>
+          <div v-if="loadingRoleUsers" class="empty-state">正在加载…</div>
+          <div v-else-if="roleUsers.length" class="role-user-list">
+            <div v-for="user in roleUsers" :key="user.id" class="role-user-row">
+              <span class="role-user-name">{{ user.display_name }}</span>
+              <span class="tag" :class="user.is_active ? 'success' : 'danger'">
+                {{ user.is_active ? '启用' : '禁用' }}
+              </span>
+            </div>
+          </div>
+          <div v-else class="empty-state">该角色下暂无用户</div>
+        </div>
+        <div class="drawer-actions">
+          <button class="secondary-button" @click="showUsersModal = false">关闭</button>
         </div>
       </div>
     </div>
@@ -368,4 +541,16 @@ onMounted(async () => {
 .grant-toolbar-head { display: flex; align-items: baseline; gap: .59rem; min-width: 0; }
 .grant-tree-hint { color: var(--muted); font-size: .9rem; }
 .grant-toolbar-actions { display: flex; align-items: center; gap: .24rem; }
+.role-user-list { display: flex; flex-direction: column; gap: .5rem; }
+.role-user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .68rem .75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.role-user-name { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
 </style>

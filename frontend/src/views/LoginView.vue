@@ -61,20 +61,6 @@ async function submit() {
         </ul>
       </div>
 
-      <dl class="portal-facts">
-        <div>
-          <dt>权限模型</dt>
-          <dd>RBAC</dd>
-        </div>
-        <div>
-          <dt>菜单策略</dt>
-          <dd>动态分配</dd>
-        </div>
-        <div>
-          <dt>数据来源</dt>
-          <dd>fruits_ana</dd>
-        </div>
-      </dl>
     </section>
 
     <section class="portal-panel">
@@ -83,7 +69,7 @@ async function submit() {
           <form class="auth-form" @submit.prevent="submit">
             <header>
               <h2>登录管理端</h2>
-              <p>请使用管理员分配的账号登录</p>
+              <p>请使用内置管理员账号登录</p>
             </header>
             <div class="auth-field">
               <label for="login-username">用户名</label>
@@ -97,10 +83,12 @@ async function submit() {
                 <input id="login-password" v-model="password" type="password" autocomplete="current-password" required />
               </div>
             </div>
-            <label class="auth-remember">
-              <input v-model="rememberMe" type="checkbox" />
-              30 天内免登录
-            </label>
+            <div class="auth-links-row">
+              <label class="auth-remember">
+                <input v-model="rememberMe" type="checkbox" />
+                30 天内免登录
+              </label>
+            </div>
             <button class="primary-button auth-submit" :disabled="loading">
               <LogIn :size="17" :stroke-width="2" aria-hidden="true" />
               {{ loading ? '登录中...' : '登录' }}

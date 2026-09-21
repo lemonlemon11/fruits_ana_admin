@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..auth import record_operation_log, require_fruit_admin
+from ..auth import record_operation_log, require_admin_user
 from ..db import get_db
 from ..models import FieldConversionRule, User
 from ..schemas import (
@@ -23,6 +23,8 @@ from ..schemas import (
 
 router = APIRouter(prefix="/api/admin/field-conversion-rules", tags=["field-conversion-rules"])
 VALUE_PATTERN = re.compile(r"^[A-Z]{1,4}$")
+ALLOWED_TARGET_VALUES = frozenset({"A", "B", "AB", "C", "D", "E", "F", "OTHER"})
+HISTORY_NOTE = "规则已变更，历史等级未重算"
 
 
 def _require_rule(db: Session, rule_id: int) -> FieldConversionRule:
@@ -39,6 +41,16 @@ def _validate_value(label: str, value: str) -> str:
     return value
 
 
+def _validate_target_value(value: str) -> str:
+    value = value.strip().upper()
+    if value not in ALLOWED_TARGET_VALUES:
+        raise HTTPException(
+            status_code=422,
+            detail="目标值必须是合法等级：A、B、AB、C、D、E、F、OTHER",
+        )
+    return value
+
+
 def _rule_read(rule: FieldConversionRule) -> FieldConversionRuleRead:
     return FieldConversionRuleRead.model_validate(rule)
 
@@ -47,7 +59,7 @@ def _rule_read(rule: FieldConversionRule) -> FieldConversionRuleRead:
 def list_rules(
     field: str = Query(default="grade", pattern=r"^(grade)$"),
     db: Session = Depends(get_db),
-    _: User = Depends(require_fruit_admin),
+    _: User = Depends(require_admin_user),
 ):
     rows = (
         db.query(FieldConversionRule)
@@ -67,10 +79,10 @@ def create_rule(
     payload: FieldConversionRuleCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_fruit_admin),
+    current_user: User = Depends(require_admin_user),
 ):
     source_value = _validate_value("原始值", payload.source_value)
-    target_value = _validate_value("目标值", payload.target_value)
+    target_value = _validate_target_value(payload.target_value)
     exists = (
         db.query(FieldConversionRule)
         .filter(
@@ -100,7 +112,7 @@ def create_rule(
             "create",
             target_type="field_conversion_rule",
             target_id=str(rule.id),
-            summary=f"新增转换规则 {payload.field_key}:{source_value}→{target_value}",
+            summary=f"新增转换规则 {payload.field_key}:{source_value}→{target_value}；{HISTORY_NOTE}",
             after_data=json.dumps(payload.model_dump(), ensure_ascii=False),
         )
         db.commit()
@@ -116,7 +128,7 @@ def update_rule(
     payload: FieldConversionRuleUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_fruit_admin),
+    current_user: User = Depends(require_admin_user),
 ):
     rule = _require_rule(db, rule_id)
     before = _rule_read(rule).model_dump(mode="json")
@@ -135,7 +147,7 @@ def update_rule(
             raise HTTPException(status_code=409, detail="该原始值的转换规则已存在")
         rule.source_value = source_value
     if payload.target_value is not None:
-        rule.target_value = _validate_value("目标值", payload.target_value)
+        rule.target_value = _validate_target_value(payload.target_value)
     if payload.sort_order is not None:
         rule.sort_order = payload.sort_order
     if payload.is_active is not None:
@@ -150,7 +162,7 @@ def update_rule(
         "update",
         target_type="field_conversion_rule",
         target_id=str(rule.id),
-        summary=f"更新转换规则 {rule.field_key}:{rule.source_value}→{rule.target_value}",
+        summary=f"更新转换规则 {rule.field_key}:{rule.source_value}→{rule.target_value}；{HISTORY_NOTE}",
         before_data=json.dumps(before, ensure_ascii=False),
         after_data=json.dumps(_rule_read(rule).model_dump(mode="json"), ensure_ascii=False),
     )
@@ -163,7 +175,7 @@ def delete_rule(
     rule_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_fruit_admin),
+    current_user: User = Depends(require_admin_user),
 ):
     rule = _require_rule(db, rule_id)
     record_operation_log(
@@ -174,7 +186,7 @@ def delete_rule(
         "delete",
         target_type="field_conversion_rule",
         target_id=str(rule.id),
-        summary=f"删除转换规则 {rule.field_key}:{rule.source_value}→{rule.target_value}",
+        summary=f"删除转换规则 {rule.field_key}:{rule.source_value}→{rule.target_value}；{HISTORY_NOTE}",
         before_data=json.dumps(_rule_read(rule).model_dump(mode="json"), ensure_ascii=False),
     )
     db.delete(rule)
@@ -186,7 +198,7 @@ def reorder_rules(
     payload: FieldConversionRuleReorder,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_fruit_admin),
+    current_user: User = Depends(require_admin_user),
 ):
     rows = {
         rule.id: rule

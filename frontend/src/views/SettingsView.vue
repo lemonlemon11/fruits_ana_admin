@@ -6,7 +6,7 @@ import { hasPermission } from '../auth'
 import Pencil from '@lucide/vue/dist/esm/icons/pencil.mjs'
 import DataTable, { type DataTableColumn } from '../components/DataTable.vue'
 
-type SettingItem = { key: string; value: string | null; description: string | null }
+type SettingItem = { key: string; value: string | null; description: string | null; editable: boolean }
 
 const items = ref<SettingItem[]>([])
 const editingKey = ref<string | null>(null)
@@ -36,6 +36,7 @@ async function load() {
 }
 
 function openEdit(item: SettingItem) {
+  if (!item.editable) return
   editingKey.value = item.key
   editValue.value = item.value || ''
 }
@@ -78,7 +79,10 @@ onMounted(load)
         <input v-else v-model="editValue" class="input" />
       </template>
       <template #cell-actions="{ row }">
-        <button v-if="editingKey !== row.key" class="table-action" @click="openEdit(row)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
+        <span v-if="!row.editable" style="color: var(--muted)">用户端维护</span>
+        <template v-else-if="editingKey !== row.key">
+          <button class="table-action" @click="openEdit(row)"><Pencil :size="15" :stroke-width="2" aria-hidden="true" />编辑</button>
+        </template>
         <template v-else>
           <button class="primary-button" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存' }}</button>
           <button class="secondary-button" :disabled="saving" @click="editingKey = null">取消</button>

@@ -1,14 +1,12 @@
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { get, post } from './api/client'
 import type { AuthUser } from './types'
 
 export const currentUser = ref<AuthUser | null>(null)
 export const authReady = ref(false)
 
-export const permissions = computed(() => new Set(currentUser.value?.permissions || []))
-
-export function hasPermission(code: string) {
-  return permissions.value.has(code)
+export function hasPermission(_code: string) {
+  return Boolean(currentUser.value)
 }
 
 export async function restoreSession() {

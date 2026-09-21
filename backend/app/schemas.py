@@ -59,7 +59,7 @@ class AuthResponse(BaseModel):
 
 class UserCreate(BaseModel):
     display_name: str = Field(min_length=1, max_length=80)
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=1, max_length=128)
     role_ids: list[int] = []
     is_active: bool = True
 
@@ -71,12 +71,19 @@ class UserUpdate(BaseModel):
 
 
 class ResetPasswordRequest(BaseModel):
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+    confirmation: str = Field(min_length=8, max_length=128)
 
 
 class UserRead(BaseModel):
     id: int
     display_name: str
+    email: str | None = None
     is_active: bool
     created_at: datetime
     last_login_at: datetime | None
@@ -250,6 +257,7 @@ class SettingRead(BaseModel):
     key: str
     value: str | None
     description: str | None
+    editable: bool = True
 
 
 class SettingUpdate(BaseModel):

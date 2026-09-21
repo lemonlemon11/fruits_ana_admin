@@ -23,6 +23,7 @@ from .models import (
     AdminRole,
     AdminRoleMenu,
     AdminRolePermission,
+    AdminSetting,
     AdminUserRole,
     User,
     UserSession,
@@ -30,51 +31,41 @@ from .models import (
 )
 
 
-SESSION_COOKIE = os.getenv("FRUIT_ADMIN_SESSION_COOKIE", "fruit_session")
+SESSION_COOKIE = os.getenv("FRUIT_ADMIN_SESSION_COOKIE", "fruit_admin_session")
+if SESSION_COOKIE in {"", "fruit_session"}:
+    SESSION_COOKIE = "fruit_admin_session"
 DEFAULT_SESSION_DAYS = 7
 REMEMBERED_SESSION_DAYS = 30
-ADMIN_PERMISSION_CODES = [
-    "admin:dashboard:view",
-    "admin:user:view",
-    "admin:user:create",
-    "admin:user:update",
-    "admin:user:delete",
-    "admin:user:reset-password",
-    "admin:user:disable",
-    "admin:role:view",
-    "admin:role:create",
-    "admin:role:update",
-    "admin:role:delete",
-    "admin:role:grant",
-    "admin:menu:view",
-    "admin:menu:create",
-    "admin:menu:update",
-    "admin:menu:delete",
-    "admin:menu:sort",
-    "admin:notification:view",
-    "admin:notification:create",
-    "admin:notification:update",
-    "admin:notification:delete",
-    "admin:notification:publish",
-    "admin:permission:view",
-    "admin:permission:create",
-    "admin:permission:update",
-    "admin:permission:delete",
-    "admin:data:view",
-    "admin:data:export",
-    "admin:data:refresh-cache",
-    "admin:log:view",
-    "admin:log:export",
-    "admin:config:view",
-    "admin:config:update",
-]
 LOGIN_REQUIRED_DETAIL = "请先登录"
-FORBIDDEN_DETAIL = "没有权限执行该操作"
 PASSWORD_HASHER = PasswordHasher()
 
 
 def normalize_username(value: str) -> str:
     return value.strip().lower()
+
+
+def get_setting_value(db: Session, key: str, default: str | None = None) -> str | None:
+    item = db.query(AdminSetting).filter(AdminSetting.key == key).first()
+    if item is None or item.value is None:
+        return default
+    return item.value
+
+
+def get_setting_int(db: Session, key: str, default: int) -> int:
+    try:
+        return int(get_setting_value(db, key, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+def get_session_days(db: Session, remember_me: bool = False) -> int:
+    key = "remember_days" if remember_me else "session_days"
+    default = REMEMBERED_SESSION_DAYS if remember_me else DEFAULT_SESSION_DAYS
+    return max(1, get_setting_int(db, key, default))
+
+
+def get_password_min_length(db: Session) -> int:
+    return min(128, max(1, get_setting_int(db, "password_min_length", 8)))
 
 
 def hash_password(password: str) -> str:
@@ -208,13 +199,29 @@ def is_admin_user(db: Session, user_id: int) -> bool:
 
 
 def get_permission_codes(db: Session, user_id: int) -> list[str]:
-    """管理端权限由控制台访问授权直接给出，与业务 RBAC 分离。"""
+    """返回用户持有的业务端权限码，管理端不再使用 ``admin:*`` 权限点。"""
 
-    return ADMIN_PERMISSION_CODES.copy() if is_admin_user(db, user_id) else []
+    role_ids = get_role_ids_for_user(db, user_id)
+    if not role_ids:
+        return []
 
-
-def has_permission(db: Session, user_id: int, permission_code: str) -> bool:
-    return permission_code in get_permission_codes(db, user_id)
+    rows = (
+        db.query(AdminPermission.code)
+        .join(
+            AdminRolePermission,
+            AdminRolePermission.permission_id == AdminPermission.id,
+        )
+        .join(AdminRole, AdminRole.id == AdminRolePermission.role_id)
+        .filter(
+            AdminRole.id.in_(role_ids),
+            AdminRole.is_active.is_(True),
+            AdminPermission.is_active.is_(True),
+            AdminPermission.module != "admin",
+        )
+        .distinct()
+        .all()
+    )
+    return [row[0] for row in rows]
 
 
 def get_user_menus(db: Session, user_id: int) -> list[AdminMenu]:
@@ -223,29 +230,15 @@ def get_user_menus(db: Session, user_id: int) -> list[AdminMenu]:
     return []
 
 
-def require_permission(permission_code: str) -> Callable:
-    def dependency(
-        request: Request,
-        current_user: User = Depends(require_current_user),
-        db: Session = Depends(get_db),
-    ) -> User:
-        if not has_permission(db, current_user.id, permission_code):
-            raise HTTPException(status_code=403, detail=FORBIDDEN_DETAIL)
-        return current_user
-
-    return dependency
-
-
-def require_fruit_admin(
+def require_admin_user(
     request: Request,
     current_user: User = Depends(require_current_user),
     db: Session = Depends(get_db),
 ) -> User:
-    """只允许业务角色 ``fruit_admin`` 维护录单字段。"""
+    """要求当前请求来自唯一的内置管理端账号。"""
 
-    roles = get_roles_for_user(db, current_user.id)
-    if not any(role.code == "fruit_admin" and role.is_active for role in roles):
-        raise HTTPException(status_code=403, detail="仅水果系统管理员可配置录单字段")
+    if not is_admin_user(db, current_user.id):
+        raise HTTPException(status_code=403, detail="该账号没有管理端访问权限")
     return current_user
 
 

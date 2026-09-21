@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..auth import record_operation_log, require_permission
+from ..auth import record_operation_log, require_admin_user
 from ..db import get_db
 from ..models import (
     AdminNotification,
@@ -26,9 +26,21 @@ from ..schemas import (
     NotificationRecipientRead,
     NotificationUpdate,
 )
-from ..serializers import notification_read
+from ..serializers import notification_read, notification_reads
 
 router = APIRouter(prefix="/api/admin/notifications", tags=["admin-notifications"])
+MAX_NOTIFICATION_CONTENT_BYTES = 2 * 1024 * 1024
+
+
+def _validate_notification_content(content: str | None) -> None:
+    if content is None:
+        return
+    size = len(content.encode("utf-8"))
+    if size > MAX_NOTIFICATION_CONTENT_BYTES:
+        raise HTTPException(
+            status_code=422,
+            detail="通知内容不能超过 2MB，请压缩图片或改用外链图片",
+        )
 
 
 def _require_notification(db: Session, notification_id: int) -> AdminNotification:
@@ -43,33 +55,60 @@ def _json_int_list(value: list[int] | None) -> str | None:
     return json.dumps(ids, ensure_ascii=False) if ids else None
 
 
+def _validated_active_user_ids(db: Session, user_ids: list[int]) -> list[int]:
+    ids = sorted({int(item) for item in user_ids})
+    if not ids:
+        raise HTTPException(status_code=422, detail="至少选择一个用户")
+    rows = (
+        db.query(User.id)
+        .filter(User.id.in_(ids), User.is_active.is_(True))
+        .all()
+    )
+    if len(rows) != len(ids):
+        raise HTTPException(status_code=422, detail="存在无效或未启用的用户")
+    return [row[0] for row in rows]
+
+
 def _target_user_ids(
     db: Session,
     target_type: str,
     role_ids: list[int] | None,
     user_ids: list[int] | None,
 ) -> list[int]:
-    query = db.query(User.id).filter(User.is_active.is_(True))
     if target_type == "role":
         role_ids = [int(item) for item in (role_ids or [])]
         if not role_ids:
             raise HTTPException(status_code=422, detail="角色定向通知至少选择一个角色")
-        roles = db.query(AdminRole).filter(AdminRole.id.in_(role_ids)).all()
+        roles = (
+            db.query(AdminRole)
+            .filter(
+                AdminRole.id.in_(role_ids),
+                AdminRole.is_active.is_(True),
+            )
+            .all()
+        )
         if len(roles) != len(set(role_ids)):
-            raise HTTPException(status_code=422, detail="存在无效角色")
+            raise HTTPException(status_code=422, detail="存在无效或未启用的角色")
         user_ids_by_role = [
             row[0]
             for row in db.query(AdminUserRole.user_id)
             .filter(AdminUserRole.role_id.in_(role_ids))
             .all()
         ]
-        query = query.filter(User.id.in_(user_ids_by_role)) if user_ids_by_role else query.filter(False)
-    elif target_type == "user":
-        user_ids = [int(item) for item in (user_ids or [])]
-        if not user_ids:
-            raise HTTPException(status_code=422, detail="用户定向通知至少选择一个用户")
-        query = query.filter(User.id.in_(user_ids))
-    return [row[0] for row in query.all()]
+        if not user_ids_by_role:
+            raise HTTPException(status_code=422, detail="所选角色下没有可用用户")
+        return _validated_active_user_ids(db, user_ids_by_role)
+
+    if target_type == "user":
+        return _validated_active_user_ids(
+            db,
+            [int(item) for item in (user_ids or [])],
+        )
+
+    return [
+        row[0]
+        for row in db.query(User.id).filter(User.is_active.is_(True)).all()
+    ]
 
 
 def _replace_recipients(
@@ -91,6 +130,8 @@ def _apply_notification_values(
     notification: AdminNotification, payload: NotificationCreate | NotificationUpdate
 ) -> None:
     data = payload.model_dump(exclude_unset=True)
+    if "content" in data:
+        _validate_notification_content(data["content"])
     for key, value in data.items():
         if key in {"target_role_ids", "target_user_ids"}:
             continue
@@ -128,7 +169,7 @@ def list_notifications(
     priority: str | None = None,
     is_published: bool | None = None,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:notification:view")),
+    _: User = Depends(require_admin_user),
 ):
     query = db.query(AdminNotification)
     if keyword:
@@ -151,7 +192,7 @@ def list_notifications(
         .limit(page_size)
         .all()
     )
-    return {"items": [notification_read(db, item) for item in items], "total": total}
+    return {"items": notification_reads(db, items), "total": total}
 
 
 @router.post("", response_model=NotificationRead, status_code=201)
@@ -159,8 +200,9 @@ def create_notification(
     payload: NotificationCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:notification:create")),
+    current_user: User = Depends(require_admin_user),
 ):
+    _validate_notification_content(payload.content)
     user_ids = _target_user_ids(
         db, payload.target_type, payload.target_role_ids, payload.target_user_ids
     )
@@ -205,7 +247,7 @@ def create_notification(
 def get_notification(
     notification_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:notification:view")),
+    _: User = Depends(require_admin_user),
 ):
     notification = _require_notification(db, notification_id)
     recipients = [
@@ -225,14 +267,23 @@ def update_notification(
     payload: NotificationUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:notification:update")),
+    current_user: User = Depends(require_admin_user),
 ):
     notification = _require_notification(db, notification_id)
-    if notification.is_published and _is_target_changed(notification, payload):
+    target_changed = _is_target_changed(notification, payload)
+    if notification.is_published and target_changed:
         raise HTTPException(status_code=400, detail="已发布通知不能修改发送范围")
 
     was_published = notification.is_published
     _apply_notification_values(notification, payload)
+
+    if target_changed:
+        _target_user_ids(
+            db,
+            notification.target_type,
+            [int(item) for item in (json.loads(notification.target_role_ids or "[]") or [])],
+            [int(item) for item in (json.loads(notification.target_user_ids or "[]") or [])],
+        )
 
     if payload.is_published and not was_published:
         notification.publish_at = payload.publish_at or utc_now()
@@ -266,7 +317,7 @@ def publish_notification(
     notification_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:notification:publish")),
+    current_user: User = Depends(require_admin_user),
 ):
     notification = _require_notification(db, notification_id)
     if notification.is_published:
@@ -299,7 +350,7 @@ def delete_notification(
     notification_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:notification:delete")),
+    current_user: User = Depends(require_admin_user),
 ):
     notification = _require_notification(db, notification_id)
     record_operation_log(

@@ -125,7 +125,7 @@ onMounted(load)
           <span class="stat-card-note">启用 {{ stats.role_active }} 个角色</span>
         </section>
         <section class="card stat-card">
-          <span class="stat-card-label">权限点</span>
+          <span class="stat-card-label">业务权限点</span>
           <strong class="stat-card-value">{{ stats.permission_total }}</strong>
           <span class="stat-card-note">启用 {{ stats.permission_active }} 个权限点</span>
         </section>

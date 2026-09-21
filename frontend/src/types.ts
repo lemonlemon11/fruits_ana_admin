@@ -30,6 +30,7 @@ export type AuthUser = {
 export type UserItem = {
   id: number
   display_name: string
+  email: string | null
   is_active: boolean
   created_at: string
   last_login_at: string | null

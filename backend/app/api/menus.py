@@ -7,7 +7,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from ..auth import record_operation_log, require_permission
+from ..auth import record_operation_log, require_admin_user
 from ..db import get_db
 from ..models import AdminMenu, AdminRoleMenu, User
 from ..schemas import MenuCreate, MenuUpdate
@@ -27,7 +27,7 @@ def _require_menu(db: Session, menu_id: int) -> AdminMenu:
 @router.get("/tree")
 def menu_tree_view(
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:menu:view")),
+    _: User = Depends(require_admin_user),
 ):
     menus = db.query(AdminMenu).order_by(AdminMenu.sort_order, AdminMenu.id).all()
     return {"items": menu_tree(menus)}
@@ -36,7 +36,7 @@ def menu_tree_view(
 @router.get("")
 def list_menus(
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:menu:view")),
+    _: User = Depends(require_admin_user),
 ):
     menus = db.query(AdminMenu).order_by(AdminMenu.sort_order, AdminMenu.id).all()
     return {"items": [menu_read(menu) for menu in menus], "total": len(menus)}
@@ -47,7 +47,7 @@ def create_menu(
     payload: MenuCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:menu:create")),
+    current_user: User = Depends(require_admin_user),
 ):
     if payload.parent_id is not None:
         _require_menu(db, payload.parent_id)
@@ -76,7 +76,7 @@ def update_menu(
     payload: MenuUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:menu:update")),
+    current_user: User = Depends(require_admin_user),
 ):
     menu = _require_menu(db, menu_id)
     before = json.dumps(menu_read(menu), ensure_ascii=False, default=str)
@@ -108,7 +108,7 @@ def delete_menu(
     menu_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:menu:delete")),
+    current_user: User = Depends(require_admin_user),
 ):
     menu = _require_menu(db, menu_id)
     children = db.query(AdminMenu).filter(AdminMenu.parent_id == menu_id).count()

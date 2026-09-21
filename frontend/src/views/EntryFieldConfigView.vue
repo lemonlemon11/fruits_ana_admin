@@ -30,8 +30,8 @@ const FIELD_TREE: Array<{ title: string; children: FieldNode[] }> = [
       {
         key: 'variety',
         label: '品种',
-        hint: '品种只允许单个大写英文字母；当前预置 A-F。',
-        validate: (value) => /^[A-Z]$/.test(value) ? null : '品种必须是单个大写英文字母',
+        hint: '品种允许 A-F，以及组合等级 AB、BC。',
+        validate: (value) => /^(?:[A-F]|AB|BC)$/.test(value) ? null : '品种必须是 A-F 或 AB、BC',
       },
     ],
   },
@@ -313,7 +313,7 @@ onMounted(async () => {
               class="input option-input"
               type="text"
               :value="draftOf(item)"
-              :placeholder="activeKey === 'variety' ? '例如 G' : '例如 南宁海吉星市场'"
+              :placeholder="activeKey === 'variety' ? '例如 AB 或 BC' : '例如 南宁海吉星市场'"
               :disabled="isSaving(item)"
               :aria-label="`${activeField.label}选项值`"
               @input="onDraftInput(item, $event)"

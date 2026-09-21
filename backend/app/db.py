@@ -156,11 +156,20 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
 def init_db() -> None:
-    """初始化已注册模型对应的数据表。"""
+    """只初始化管理端自有表。
+
+    业务共享表（`user`、`import_batch`、`sale_record` 等）由
+    `fruits_ana` 用户端统一管理，管理端启动不得创建或改变这些表。
+    """
 
     from . import models  # noqa: F401
 
-    Base.metadata.create_all(bind=engine)
+    admin_tables = [
+        table
+        for table in Base.metadata.sorted_tables
+        if table.name.startswith("admin_")
+    ]
+    Base.metadata.create_all(bind=engine, tables=admin_tables)
 
 
 def get_db():

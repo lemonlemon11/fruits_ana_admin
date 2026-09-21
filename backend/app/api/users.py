@@ -10,17 +10,18 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from ..auth import (
+    get_password_min_length,
     hash_password,
     normalize_username,
     record_operation_log,
     require_current_user,
-    require_permission,
+    require_admin_user,
     revoke_all_sessions,
 )
 from ..db import get_db
 from ..models import AdminRole, AdminUserRole, User
 from ..schemas import ResetPasswordRequest, UserCreate, UserListResponse, UserUpdate
-from ..serializers import user_read
+from ..serializers import user_read, user_reads
 
 
 router = APIRouter(prefix="/api/admin/users", tags=["admin-users"])
@@ -55,6 +56,15 @@ def _find_user_by_name(db: Session, display_name: str) -> User | None:
     )
 
 
+def _validate_password_length(db: Session, password: str) -> None:
+    min_length = get_password_min_length(db)
+    if len(password) < min_length:
+        raise HTTPException(
+            status_code=422,
+            detail=f"密码长度不能少于 {min_length} 位",
+        )
+
+
 @router.get("", response_model=UserListResponse)
 def list_users(
     page: int = Query(1, ge=1),
@@ -63,7 +73,7 @@ def list_users(
     is_active: bool | None = None,
     role_id: int | None = None,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:user:view")),
+    _: User = Depends(require_admin_user),
 ):
     query = db.query(User)
     if keyword:
@@ -86,7 +96,7 @@ def list_users(
         .limit(page_size)
         .all()
     )
-    return {"items": [user_read(db, user) for user in users], "total": total}
+    return {"items": user_reads(db, users), "total": total}
 
 
 @router.post("", status_code=201)
@@ -94,12 +104,13 @@ def create_user(
     payload: UserCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:user:create")),
+    current_user: User = Depends(require_admin_user),
 ):
     if _find_user_by_name(db, payload.display_name) is not None:
         raise HTTPException(status_code=409, detail="用户名已存在")
 
     _require_roles(db, payload.role_ids)
+    _validate_password_length(db, payload.password)
     user = User(
         display_name=payload.display_name.strip(),
         password_hash=hash_password(payload.password),
@@ -117,7 +128,11 @@ def create_user(
         target_type="user",
         target_id=str(user.id),
         summary=f"创建用户 {user.display_name}",
-        after_data=json.dumps(payload.model_dump(), ensure_ascii=False, default=str),
+        after_data=json.dumps(
+            payload.model_dump(exclude={"password"}),
+            ensure_ascii=False,
+            default=str,
+        ),
     )
     db.commit()
     return user_read(db, user)
@@ -127,7 +142,7 @@ def create_user(
 def get_user(
     user_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:user:view")),
+    _: User = Depends(require_admin_user),
 ):
     return user_read(db, _require_user(db, user_id))
 
@@ -138,7 +153,7 @@ def update_user(
     payload: UserUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:user:update")),
+    current_user: User = Depends(require_admin_user),
 ):
     user = _require_user(db, user_id)
     before = json.dumps(user_read(db, user), ensure_ascii=False, default=str)
@@ -185,9 +200,10 @@ def reset_password(
     payload: ResetPasswordRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:user:reset-password")),
+    current_user: User = Depends(require_admin_user),
 ):
     user = _require_user(db, user_id)
+    _validate_password_length(db, payload.password)
     user.password_hash = hash_password(payload.password)
     revoke_all_sessions(db, user.id)
     record_operation_log(
@@ -209,7 +225,7 @@ def force_logout(
     user_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:user:update")),
+    current_user: User = Depends(require_admin_user),
 ):
     user = _require_user(db, user_id)
     revoke_all_sessions(db, user.id)
@@ -232,7 +248,7 @@ def delete_user(
     user_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:user:delete")),
+    current_user: User = Depends(require_admin_user),
 ):
     user = _require_user(db, user_id)
     if user.id == current_user.id:

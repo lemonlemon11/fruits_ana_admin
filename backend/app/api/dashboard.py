@@ -8,9 +8,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..auth import require_permission
+from ..auth import require_admin_user
 from ..db import get_db
 from ..models import (
+    as_beijing_str,
     AdminLoginLog,
     AdminMenu,
     AdminOperationLog,
@@ -35,10 +36,11 @@ router = APIRouter(prefix="/api/admin/dashboard", tags=["admin-dashboard"])
 @router.get("/stats", response_model=DashboardStats)
 def stats(
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:dashboard:view")),
+    _: User = Depends(require_admin_user),
 ):
     now = utc_now()
-    week_ago = now - timedelta(days=6)
+    now_naive = now.replace(tzinfo=None)
+    week_ago = now_naive - timedelta(days=6)
 
     user_total = db.query(User).count()
     user_active = db.query(User).filter(User.is_active.is_(True)).count()
@@ -141,7 +143,7 @@ def stats(
     login_by_day = {str(row[0]): row[1] for row in login_trend_rows}
     login_trend = []
     for offset in range(6, -1, -1):
-        day = (now.date() - timedelta(days=offset)).isoformat()
+        day = (now_naive.date() - timedelta(days=offset)).isoformat()
         login_trend.append({"date": day, "value": login_by_day.get(day, 0)})
 
     recent_logins = (
@@ -186,7 +188,7 @@ def stats(
             sale_date_range[1].isoformat() if sale_date_range[1] else None
         ),
         "latest_import_at": (
-            latest_import_at_value.isoformat() if latest_import_at_value else None
+            as_beijing_str(latest_import_at_value)
         ),
         "grade_distribution": grade_distribution,
         "fruit_type_distribution": fruit_type_distribution,
@@ -198,7 +200,7 @@ def stats(
                 "message": item.message,
                 "ip": item.ip,
                 "user_agent": item.user_agent,
-                "created_at": item.created_at.isoformat() if item.created_at else "",
+                "created_at": as_beijing_str(item.created_at) or "",
             }
             for item in recent_logins
         ],
@@ -214,7 +216,7 @@ def stats(
                 "status": item.status,
                 "ip": item.ip,
                 "user_agent": item.user_agent,
-                "created_at": item.created_at.isoformat() if item.created_at else "",
+                "created_at": as_beijing_str(item.created_at) or "",
             }
             for item in recent_operations
         ],

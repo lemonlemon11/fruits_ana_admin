@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
-from ..auth import require_permission
+from ..auth import record_operation_log, require_admin_user
 from ..db import get_db
 from ..models import (
+    as_beijing_str,
     AiAnalysis,
     DataIssue,
     ImportBatch,
@@ -31,7 +32,7 @@ def _batch_dict(batch: ImportBatch) -> dict:
         "order_no_normalized": batch.order_no_normalized,
         "container_no": batch.container_no,
         "vehicle_no": batch.vehicle_no,
-        "imported_at": batch.imported_at.isoformat() if batch.imported_at else None,
+        "imported_at": as_beijing_str(batch.imported_at),
         "status": batch.status,
         "success_count": batch.success_count,
         "warning_count": batch.warning_count,
@@ -52,7 +53,7 @@ def _issue_dict(issue: DataIssue) -> dict:
         "field_name": issue.field_name,
         "message": issue.message,
         "raw_value": issue.raw_value,
-        "created_at": issue.created_at.isoformat() if issue.created_at else None,
+        "created_at": as_beijing_str(issue.created_at),
     }
 
 
@@ -63,7 +64,7 @@ def _source_dict(source: SourceFile) -> dict:
         "file_name": source.file_name,
         "file_hash": source.file_hash,
         "storage_path": source.storage_path,
-        "stored_at": source.stored_at.isoformat() if source.stored_at else None,
+        "stored_at": as_beijing_str(source.stored_at),
     }
 
 
@@ -74,7 +75,7 @@ def _ai_dict(item: AiAnalysis) -> dict:
         "feature": item.feature,
         "model": item.model,
         "content": item.content,
-        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "created_at": as_beijing_str(item.created_at),
     }
 
 
@@ -85,7 +86,7 @@ def list_imports(
     keyword: str | None = None,
     status: str | None = None,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:data:view")),
+    _: User = Depends(require_admin_user),
 ):
     query = db.query(ImportBatch)
     if keyword:
@@ -113,7 +114,7 @@ def list_imports(
 def get_import(
     batch_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:data:view")),
+    _: User = Depends(require_admin_user),
 ):
     batch = db.get(ImportBatch, batch_id)
     if batch is None:
@@ -125,7 +126,7 @@ def get_import(
 def list_import_issues(
     batch_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:data:view")),
+    _: User = Depends(require_admin_user),
 ):
     batch = db.get(ImportBatch, batch_id)
     if batch is None:
@@ -144,7 +145,7 @@ def list_source_files(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:data:view")),
+    _: User = Depends(require_admin_user),
 ):
     query = db.query(SourceFile)
     total = query.count()
@@ -163,7 +164,7 @@ def list_sales(
     page_size: int = Query(20, ge=1, le=100),
     import_batch_id: int | None = None,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:data:view")),
+    _: User = Depends(require_admin_user),
 ):
     query = db.query(SaleRecord)
     if import_batch_id is not None:
@@ -201,7 +202,7 @@ def list_ai_cache(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:data:view")),
+    _: User = Depends(require_admin_user),
 ):
     query = db.query(AiAnalysis)
     total = query.count()
@@ -217,12 +218,24 @@ def list_ai_cache(
 @router.delete("/ai-cache/{cache_id}", status_code=204)
 def delete_ai_cache(
     cache_id: int,
+    request: Request,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:data:refresh-cache")),
+    current_user: User = Depends(require_admin_user),
 ):
     item = db.get(AiAnalysis, cache_id)
     if item is None:
         raise HTTPException(status_code=404, detail="AI 缓存不存在")
+    cache_key = item.cache_key
     db.delete(item)
+    record_operation_log(
+        db,
+        request,
+        current_user,
+        "data",
+        "delete-ai-cache",
+        target_type="ai_cache",
+        target_id=str(cache_id),
+        summary=f"删除 AI 缓存 {cache_key}",
+    )
     db.commit()
     return None

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..auth import record_operation_log, require_fruit_admin
+from ..auth import record_operation_log, require_admin_user
 from ..db import get_db
 from ..models import EntryFieldOption, User
 from ..schemas import (
@@ -22,7 +22,7 @@ from ..schemas import (
 
 
 router = APIRouter(prefix="/api/admin/entry-field-options", tags=["entry-field-options"])
-VARIETY_PATTERN = re.compile(r"^[A-Z]$")
+VARIETY_PATTERN = re.compile(r"^(?:[A-F]|AB|BC)$")
 
 
 def _require_option(db: Session, option_id: int) -> EntryFieldOption:
@@ -37,8 +37,11 @@ def _validate_value(field_key: str, value: str) -> str:
     if not value:
         raise HTTPException(status_code=422, detail="选项值不能为空")
     if field_key == "variety":
-        if not VARIETY_PATTERN.fullmatch(value) or value == "BC":
-            raise HTTPException(status_code=422, detail="品种必须是单个大写英文字母，且不能使用 BC")
+        if not VARIETY_PATTERN.fullmatch(value):
+            raise HTTPException(
+                status_code=422,
+                detail="品种必须是 A-F，或组合等级 AB、BC",
+            )
     return value
 
 
@@ -50,7 +53,7 @@ def _option_read(option: EntryFieldOption) -> EntryFieldOptionRead:
 def list_options(
     field: str = Query(default="market", pattern="^(market|variety)$"),
     db: Session = Depends(get_db),
-    _: User = Depends(require_fruit_admin),
+    _: User = Depends(require_admin_user),
 ):
     rows = (
         db.query(EntryFieldOption)
@@ -70,7 +73,7 @@ def create_option(
     payload: EntryFieldOptionCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_fruit_admin),
+    current_user: User = Depends(require_admin_user),
 ):
     value = _validate_value(payload.field_key, payload.value)
     exists = (
@@ -116,7 +119,7 @@ def update_option(
     payload: EntryFieldOptionUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_fruit_admin),
+    current_user: User = Depends(require_admin_user),
 ):
     option = _require_option(db, option_id)
     before = _option_read(option).model_dump(mode="json")
@@ -159,7 +162,7 @@ def reorder_options(
     payload: EntryFieldOptionReorder,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_fruit_admin),
+    current_user: User = Depends(require_admin_user),
 ):
     """按提交顺序批量更新同一字段下的排序值。"""
 
@@ -206,7 +209,7 @@ def delete_option(
     option_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_fruit_admin),
+    current_user: User = Depends(require_admin_user),
 ):
     option = _require_option(db, option_id)
     record_operation_log(

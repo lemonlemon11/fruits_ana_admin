@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 from typing import Any
 
 from sqlalchemy import (
@@ -24,6 +25,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.mysql import DATETIME as MySQLDateTime
+from sqlalchemy.dialects.mysql import MEDIUMTEXT as MySQLMediumText
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -33,6 +35,18 @@ def utc_now() -> datetime:
     """返回带时区的当前 UTC 时间。"""
 
     return datetime.now(timezone.utc)
+
+
+BEIJING_TZ = ZoneInfo("Asia/Shanghai")
+
+
+def as_beijing_str(dt: datetime | None) -> str | None:
+    """将 UTC datetime（naive 视作 UTC）转为北京时间 ISO 字符串。"""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(BEIJING_TZ).isoformat()
 
 
 PRECISE_DATETIME = DateTime(timezone=True).with_variant(
@@ -49,6 +63,9 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     display_name: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
+    email: Mapped[str | None] = mapped_column(
+        String(320), nullable=True, comment="用户邮箱，nullable 兼容老用户"
+    )
     created_at: Mapped[datetime] = mapped_column(
         PRECISE_DATETIME, default=utc_now, nullable=False
     )
@@ -205,7 +222,9 @@ class AiAnalysis(Base):
     cache_key: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     feature: Mapped[str] = mapped_column(String(64), nullable=False)
     model: Mapped[str] = mapped_column(String(120), nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(
+        Text().with_variant(MySQLMediumText, "mysql"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         PRECISE_DATETIME, default=utc_now, nullable=False
     )

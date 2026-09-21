@@ -47,8 +47,14 @@ function isSaving(item: FieldConversionRule) {
   return savingIds.value.includes(item.id)
 }
 
-function validGrade(value: string) {
+const TARGET_GRADES = new Set(['A', 'B', 'AB', 'C', 'D', 'E', 'F', 'OTHER'])
+
+function validSourceGrade(value: string) {
   return /^[A-Z]{1,4}$/.test(value.trim().toUpperCase())
+}
+
+function validTargetGrade(value: string) {
+  return TARGET_GRADES.has(value.trim().toUpperCase())
 }
 
 async function load() {
@@ -74,8 +80,12 @@ function openCreate() {
 async function createRule() {
   const source = form.source_value.trim().toUpperCase()
   const target = form.target_value.trim().toUpperCase()
-  if (!validGrade(source) || !validGrade(target)) {
-    notify('原始值和目标值必须由 1-4 个大写英文字母组成', 'error')
+  if (!validSourceGrade(source)) {
+    notify('原始值必须由 1-4 个大写英文字母组成', 'error')
+    return
+  }
+  if (!validTargetGrade(target)) {
+    notify('目标值必须是 A、B、AB、C、D、E、F、OTHER', 'error')
     return
   }
   saving.value = true
@@ -106,9 +116,15 @@ async function commit(item: FieldConversionRule, key: 'source_value' | 'target_v
     drafts.value[item.id] = { ...drafts.value[item.id], [key]: next }
     return
   }
-  if (key !== 'description' && !validGrade(next)) {
+  const valid = key === 'source_value' ? validSourceGrade(next) : validTargetGrade(next)
+  if (key !== 'description' && !valid) {
     drafts.value[item.id] = { ...drafts.value[item.id], [key]: item[key] ?? '' }
-    notify('原始值和目标值必须由 1-4 个大写英文字母组成', 'error')
+    notify(
+      key === 'source_value'
+        ? '原始值必须由 1-4 个大写英文字母组成'
+        : '目标值必须是 A、B、AB、C、D、E、F、OTHER',
+      'error',
+    )
     return
   }
   startSaving(item)
@@ -205,7 +221,8 @@ onMounted(load)
         <div>
           <h2>品种统计转换</h2>
           <p class="field-hint">界面继续显示用户原始品种；转换规则只影响看板、统计和导出。</p>
-          <p class="field-hint">默认规则：BC → C。可直接改原值、目标值、说明或启用状态，失焦即保存。</p>
+          <p class="field-hint">默认规则：BC → C。规则变更仅影响新导入数据，历史等级不会重算。</p>
+          <p class="field-hint">可直接改原值、目标值、说明或启用状态，失焦即保存。</p>
         </div>
         <button class="primary-button toolbar-action" type="button" @click="openCreate">
           <Plus :size="16" :stroke-width="2" aria-hidden="true" />新增转换规则

@@ -1,17 +1,17 @@
 # SLD 水果市场销售分析 · 管理员端
 
 独立于 `fruits_ana` 的管理端项目，复用同一个 MySQL 数据库，负责用户、角色、菜单、
-权限、业务数据、审计日志和站内通知管理。
+业务数据、审计日志和站内通知管理。管理端自身只保留一个内置超级管理员账号。
 
 ## 功能概览
 
 - 工作台：系统运行概况、业务数据健康度与最近管理动态。
-- 用户管理：登录账号、启用/禁用、角色分配、重置密码、强制下线与删除。
-- 角色管理：新增/编辑/删除角色，按菜单树和权限点批量授权。
+- 用户管理：登录账号、关联邮箱、启用/禁用、角色分配、重置密码、强制下线与删除。
+- 角色管理：新增/编辑/删除角色，按菜单树和用户端业务权限点批量授权，用户数可点击查看成员。
 - 菜单管理：以可折叠树维护目录、菜单、按钮，以及路由、图标和权限标识。
-- 权限管理：维护权限点编码、所属模块、类型与启用状态。
 - 通知管理：富文本编辑、定时发布、按角色/用户定向接收、阅读统计。
 - 业务数据、审计日志与系统配置：查看与维护业务数据、操作日志和系统参数。
+- 账号安全：登录后可在右上角修改密码；忘记密码时通过 `app.bootstrap` 在服务器上重置。
 
 ## 界面交互
 
@@ -45,21 +45,55 @@ cp backend/.env.example backend/.env
 # 修改 backend/.env 中的数据库连接
 ```
 
-## 初始化管理员角色与权限
+运行日志可通过以下环境变量调整（默认写入 `backend/data/logs/fruits_ana_admin.log`）：
 
-后端启动时会自动创建 `admin_*` 表并写入默认菜单、权限和角色。
+```bash
+FRUIT_ADMIN_LOG_LEVEL=INFO
+FRUIT_ADMIN_LOG_DIR=backend/data/logs
+FRUIT_ADMIN_LOG_FILE=fruits_ana_admin.log
+FRUIT_ADMIN_LOG_MAX_BYTES=5242880
+FRUIT_ADMIN_LOG_BACKUP_COUNT=5
+```
+
+## 初始化唯一管理端账号与业务权限
+
+后端启动时会自动创建 `admin_*` 表，写入用户端业务菜单、权限和角色，并幂等创建唯一管理端账号：
+
+- 用户名：`admin`
+- 初始密码：`12345678`（可通过 `FRUIT_ADMIN_DEFAULT_PASSWORD` 覆盖）
 
 站内通知使用共享数据库中的 `admin_notification` 与
 `admin_notification_recipient` 两张表。管理端负责创建、定时发布和阅读统计，
 `fruits_ana` 用户端通过 `/api/notifications` 只读拉取并标记已读。
 
-首次使用需将某个现有用户设为超级管理员：
+升级既有 MySQL 库时，若通知富文本需要插入 Base64 图片，请执行：
 
 ```bash
-.venv/bin/python -m app.bootstrap --username lhp
+cd backend
+../.venv/bin/python scripts/expand_notification_content.py --apply
 ```
 
-执行前请确认用户名存在。该命令只会创建角色绑定，不会创建新用户或修改密码。
+该脚本将 `admin_notification.content` 从 `TEXT` 扩为 `MEDIUMTEXT`，默认只演练。
+
+若历史版本把管理端权限或多余菜单误写入了业务系统角色，可执行：
+
+```bash
+cd backend
+../.venv/bin/python scripts/repair_seeded_role_grants.py            # 演练
+../.venv/bin/python scripts/repair_seeded_role_grants.py --apply    # 写库
+```
+
+该脚本会把 `fruit_admin`、`operator`、`viewer`、`data_entry`、
+`registered_user` 等种子系统角色恢复到种子定义，默认只演练。
+
+如需在服务器上重置 `admin` 密码：
+
+```bash
+cd backend
+.venv/bin/python -m app.bootstrap --username admin --reset-password
+```
+
+该命令会交互式输入新密码，并强制下线该账号的全部会话。
 
 ## 启动
 
@@ -84,10 +118,13 @@ npm --prefix frontend run dev -- --host 0.0.0.0 --port 54000
 ## 验证
 
 ```bash
-.venv/bin/python -m pytest backend/tests -q
 npm --prefix frontend run typecheck
 npm --prefix frontend run build
+.venv/bin/python -m compileall -q backend/app backend/scripts
 ```
+
+当前仓库未安装 `pytest`，如后续补装可运行 `backend/tests`；未安装时以
+`compileall` 和接口导入检查作为后端基础验证。
 
 ## 安全说明
 

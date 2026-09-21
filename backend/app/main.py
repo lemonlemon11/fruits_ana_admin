@@ -3,10 +3,37 @@
 from __future__ import annotations
 
 import os
+import time
 from contextlib import asynccontextmanager
+from uuid import uuid4
+
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI
+from fastapi.encoders import jsonable_encoder as _orig_jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
+import fastapi.routing as _routing
+
+from .logging_config import configure_logging, get_logger, request_id_var
+
+
+_BEIJING_TZ = ZoneInfo("Asia/Shanghai")
+
+configure_logging()
+logger = get_logger()
+
+
+def _beijing_encoder(obj, *args, **kwargs):
+    if isinstance(obj, datetime) and obj.tzinfo is not None:
+        return obj.astimezone(_BEIJING_TZ).isoformat()
+    return _orig_jsonable_encoder(obj, *args, **kwargs)
+
+
+# Patch both references to ensure serialization uses Beijing timezone
+import fastapi.encoders
+fastapi.encoders.jsonable_encoder = _beijing_encoder
+_routing.jsonable_encoder = _beijing_encoder
 
 from .api.auth import router as auth_router
 from .api.dashboard import router as dashboard_router
@@ -69,6 +96,59 @@ app.include_router(notifications_router)
 app.include_router(data_router)
 app.include_router(logs_router)
 app.include_router(settings_router)
+
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    """记录每个请求的耗时、状态码与请求 ID；未捕获异常落 error 日志。"""
+
+    request_id = request.headers.get("X-Request-ID") or uuid4().hex[:12]
+    token = request_id_var.set(request_id)
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+        duration_ms = (time.perf_counter() - started) * 1000
+        response.headers["X-Request-ID"] = request_id
+        _log_request(request.method, request.url.path, response.status_code, duration_ms)
+        return response
+    except Exception:
+        duration_ms = (time.perf_counter() - started) * 1000
+        logger.exception(
+            "request failed method=%s path=%s status=500 duration_ms=%.1f",
+            request.method,
+            request.url.path,
+            duration_ms,
+        )
+        raise
+    finally:
+        request_id_var.reset(token)
+
+
+def _log_request(method: str, path: str, status_code: int, duration_ms: float) -> None:
+    if status_code >= 500:
+        logger.error(
+            "request completed method=%s path=%s status=%s duration_ms=%.1f",
+            method,
+            path,
+            status_code,
+            duration_ms,
+        )
+    elif status_code >= 400:
+        logger.warning(
+            "request completed method=%s path=%s status=%s duration_ms=%.1f",
+            method,
+            path,
+            status_code,
+            duration_ms,
+        )
+    else:
+        logger.info(
+            "request completed method=%s path=%s status=%s duration_ms=%.1f",
+            method,
+            path,
+            status_code,
+            duration_ms,
+        )
 
 
 @app.get("/health", tags=["system"])

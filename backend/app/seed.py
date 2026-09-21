@@ -1,14 +1,18 @@
-"""初始化 fruits_ana 业务 RBAC 数据与管理端控制台访问授权。
+"""初始化 fruits_ana 业务 RBAC 数据与唯一管理端账号。
 
-业务侧数据面向 `fruits_ana` 的菜单和权限；管理端自身权限由
-`admin_access` 表单独控制，不在业务菜单/权限管理页面中维护。
+业务角色 / 菜单 / 权限点只负责用户端权限；管理端不再维护控制台权限点。
+应用启动时会幂等创建唯一管理端账号 ``admin``。
 """
 
 from __future__ import annotations
 
+import os
+
 from sqlalchemy import or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from .auth import hash_password
 from .models import (
     AdminAccess,
     AdminMenu,
@@ -16,11 +20,13 @@ from .models import (
     AdminRole,
     AdminRoleMenu,
     AdminRolePermission,
-    AdminUserRole,
     EntryFieldOption,
     FieldConversionRule,
     User,
 )
+
+ADMIN_USERNAME = "admin"
+DEFAULT_ADMIN_PASSWORD = os.getenv("FRUIT_ADMIN_DEFAULT_PASSWORD", "12345678")
 
 FRUIT_PERMISSIONS: list[tuple[str, str, str, str]] = [
     ("overview:view", "查看销售总览", "overview", "menu"),
@@ -28,16 +34,15 @@ FRUIT_PERMISSIONS: list[tuple[str, str, str, str]] = [
     ("settlement:detail", "查看结算单详情", "settlement", "menu"),
     ("settlement:comparison", "使用结算单对比", "settlement", "menu"),
     ("series:comparison", "使用品牌系列对比", "series", "menu"),
-    ("import:view", "查看数据导入", "import", "menu"),
+    ("import:view", "查看录单 / 导入", "import", "menu"),
     ("import:upload", "上传导入文件", "import", "action"),
     ("import:process", "处理导入批次", "import", "action"),
-    ("entry:view", "查看手工录单", "entry", "menu"),
-    ("entry:create", "新增手工录单", "entry", "action"),
-    ("entry:update", "修改手工录单", "entry", "action"),
-    ("entry:export", "导出手工录单", "entry", "action"),
+    ("entry:view", "查看手工录单页面", "import", "action"),
+    ("entry:create", "新增手工录单", "import", "action"),
+    ("entry:update", "修改手工录单", "import", "action"),
+    ("entry:export", "导出手工录单", "import", "action"),
     ("data:export", "导出业务数据", "data", "action"),
     ("ai:refresh", "刷新 AI 分析", "ai", "action"),
-    ("preview:view", "查看公开预览", "preview", "menu"),
     ("ask:view", "使用数据问答顺仔", "ask", "action"),
 ]
 
@@ -78,24 +83,13 @@ FRUIT_MENUS: list[dict] = [
     {
         "key": "imports",
         "parent": "sales-analysis",
-        "name": "数据导入",
+        "name": "录单 / 导入",
         "menu_type": "menu",
         "route_path": "/imports",
         "component": "ImportView",
         "icon": "Upload",
         "permission_code": "import:view",
         "sort_order": 30,
-    },
-    {
-        "key": "entry",
-        "parent": "sales-analysis",
-        "name": "手工录单",
-        "menu_type": "menu",
-        "route_path": "/entry",
-        "component": "EntryView",
-        "icon": "FilePen",
-        "permission_code": "entry:view",
-        "sort_order": 40,
     },
     {
         "key": "settlement-analysis",
@@ -141,23 +135,20 @@ FRUIT_MENUS: list[dict] = [
         "permission_code": "series:comparison",
         "sort_order": 30,
     },
-    {
-        "key": "preview",
-        "parent": None,
-        "name": "公开预览",
-        "menu_type": "menu",
-        "route_path": "/preview",
-        "component": "PublicPreviewView",
-        "icon": "Eye",
-        "permission_code": "preview:view",
-        "sort_order": 30,
-    },
 ]
 
 FRUIT_ROLES: list[dict] = [
     {
+        "code": "registered_user",
+        "name": "新注册用户",
+        "description": "新用户注册后的默认角色，暂不开放任何菜单和权限",
+        "is_system": True,
+        "permissions": [],
+        "menus": [],
+    },
+    {
         "code": "fruit_admin",
-        "name": "水果系统管理员",
+        "name": "业务主管理员",
         "description": "拥有 fruits_ana 全部业务菜单与权限",
         "is_system": True,
         "permissions": [item[0] for item in FRUIT_PERMISSIONS],
@@ -189,7 +180,6 @@ FRUIT_ROLES: list[dict] = [
             "overview",
             "settlements",
             "imports",
-            "entry",
             "settlement-analysis",
             "settlement-detail",
             "settlement-comparison",
@@ -208,7 +198,6 @@ FRUIT_ROLES: list[dict] = [
             "settlement:comparison",
             "series:comparison",
             "import:view",
-            "preview:view",
         ],
         "menus": [
             "sales-analysis",
@@ -219,7 +208,6 @@ FRUIT_ROLES: list[dict] = [
             "settlement-detail",
             "settlement-comparison",
             "series-comparison",
-            "preview",
         ],
     },
     {
@@ -239,91 +227,88 @@ FRUIT_ROLES: list[dict] = [
         "menus": [
             "sales-analysis",
             "imports",
-            "entry",
         ],
     },
 ]
 
-LEGACY_ADMIN_ROLE_CODES = {"super_admin", "operation_admin", "auditor"}
-
-
 def seed_admin_data(db: Session) -> None:
-    """同步 fruits_ana RBAC 数据，并确保控制台账号可登录。"""
+    """补缺唯一管理端账号、业务权限/菜单/角色及基础配置。"""
 
-    _purge_legacy_admin_rbac(db)
-    permission_by_code = _seed_permissions(db)
+    permission_by_code = _seed_permission_specs(db, FRUIT_PERMISSIONS)
     menu_by_key = _seed_menus(db)
     _seed_roles(db, permission_by_code, menu_by_key)
-    _assign_user_role(db, "test", "fruit_admin")
-    _seed_admin_access(db, "test")
-    _seed_entry_field_options(db)
+    _seed_admin_account(db)
+    _remove_admin_permissions(db)
     _seed_field_conversion_rules(db)
     db.commit()
 
+    try:
+        _seed_entry_field_options(db)
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        print(
+            "[seed] 跳过录单字段字典种子：共享表 entry_field_option 尚不可用，"
+            "请先启动 fruits_ana 用户端初始化共享表。"
+            f"（{exc}）"
+        )
 
-def _purge_legacy_admin_rbac(db: Session) -> None:
-    """清理早期误建的管理端自身 RBAC 数据，保留业务 RBAC。"""
 
-    legacy_roles = (
-        db.query(AdminRole)
-        .filter(AdminRole.code.in_(LEGACY_ADMIN_ROLE_CODES))
-        .all()
+def _seed_admin_account(db: Session) -> None:
+    """创建唯一管理端账号 admin，并确保其他账号没有控制台访问授权。"""
+
+    user = db.query(User).filter(User.display_name == ADMIN_USERNAME).first()
+    if user is None:
+        user = User(
+            display_name=ADMIN_USERNAME,
+            password_hash=hash_password(DEFAULT_ADMIN_PASSWORD),
+            is_active=True,
+        )
+        db.add(user)
+        db.flush()
+
+    db.query(AdminAccess).filter(AdminAccess.user_id != user.id).delete(
+        synchronize_session=False
     )
-    for role in legacy_roles:
-        db.query(AdminUserRole).filter(AdminUserRole.role_id == role.id).delete()
-        db.query(AdminRoleMenu).filter(AdminRoleMenu.role_id == role.id).delete()
-        db.query(AdminRolePermission).filter(
-            AdminRolePermission.role_id == role.id
-        ).delete()
-        db.delete(role)
-
-    legacy_permissions = (
-        db.query(AdminPermission)
-        .filter(AdminPermission.code.like("admin:%"))
-        .all()
-    )
-    legacy_permission_ids = [item.id for item in legacy_permissions]
-    if legacy_permission_ids:
-        db.query(AdminRolePermission).filter(
-            AdminRolePermission.permission_id.in_(legacy_permission_ids)
-        ).delete(synchronize_session=False)
-        for item in legacy_permissions:
-            db.delete(item)
-
-    legacy_menu_components = [
-        "DashboardView",
-        "UsersView",
-        "RolesView",
-        "MenusView",
-        "PermissionsView",
-        "DataView",
-        "LogsView",
-        "SettingsView",
-    ]
-    legacy_menus = (
-        db.query(AdminMenu)
-        .filter(
-            or_(
-                AdminMenu.route_path.like("/admin/%"),
-                AdminMenu.name == "系统管理",
-                AdminMenu.component.in_(legacy_menu_components),
+    access = db.query(AdminAccess).filter(AdminAccess.user_id == user.id).first()
+    if access is None:
+        db.add(
+            AdminAccess(
+                user_id=user.id,
+                is_active=True,
+                is_super_admin=True,
             )
         )
+    else:
+        access.is_active = True
+        access.is_super_admin = True
+
+
+def _remove_admin_permissions(db: Session) -> None:
+    """删除历史遗留的管理端 ``admin:*`` 权限点及其角色引用。"""
+
+    admin_permissions = (
+        db.query(AdminPermission)
+        .filter(AdminPermission.module == "admin")
         .all()
     )
-    legacy_menu_ids = [item.id for item in legacy_menus]
-    if legacy_menu_ids:
-        db.query(AdminRoleMenu).filter(
-            AdminRoleMenu.menu_id.in_(legacy_menu_ids)
-        ).delete(synchronize_session=False)
-        for item in legacy_menus:
-            db.delete(item)
-    db.flush()
+    if not admin_permissions:
+        return
+
+    permission_ids = [permission.id for permission in admin_permissions]
+    db.query(AdminRolePermission).filter(
+        AdminRolePermission.permission_id.in_(permission_ids)
+    ).delete(synchronize_session=False)
+    for permission in admin_permissions:
+        db.delete(permission)
 
 
-def _seed_permissions(db: Session) -> dict[str, AdminPermission]:
+def _seed_permission_specs(
+    db: Session,
+    specs: list[tuple[str, str, str, str]],
+) -> dict[str, AdminPermission]:
     result: dict[str, AdminPermission] = {}
-    for code, name, module, permission_type in FRUIT_PERMISSIONS:
+    for code, name, module, permission_type in specs:
         item = db.query(AdminPermission).filter(AdminPermission.code == code).first()
         if item is None:
             item = AdminPermission(
@@ -334,30 +319,54 @@ def _seed_permissions(db: Session) -> dict[str, AdminPermission]:
             )
             db.add(item)
             db.flush()
-        else:
-            item.name = name
-            item.module = module
-            item.permission_type = permission_type
-            item.is_active = True
         result[code] = item
     return result
+
+
+def _find_seed_menu(
+    db: Session, spec: dict, parent_id: int | None
+) -> AdminMenu | None:
+    """按稳定标识查找种子菜单，避免管理员改名后被重复补建。
+
+    匹配优先级：权限码 → 路由路径 → 同级同类排序 → 同级同类同名。
+    前两项与界面文案无关，管理员重命名菜单后仍能命中同一条记录；
+    后两项为没有权限码与路由的目录兜底。
+    """
+
+    for column, value in (
+        (AdminMenu.permission_code, spec["permission_code"]),
+        (AdminMenu.route_path, spec["route_path"]),
+    ):
+        if not value:
+            continue
+        item = db.query(AdminMenu).filter(column == value).first()
+        if item is not None:
+            return item
+
+    return (
+        db.query(AdminMenu)
+        .filter(
+            AdminMenu.parent_id == parent_id,
+            AdminMenu.menu_type == spec["menu_type"],
+            or_(
+                AdminMenu.sort_order == spec["sort_order"],
+                AdminMenu.name == spec["name"],
+            ),
+        )
+        .order_by(AdminMenu.sort_order, AdminMenu.id)
+        .first()
+    )
 
 
 def _seed_menus(db: Session) -> dict[str, AdminMenu]:
     menu_by_key: dict[str, AdminMenu] = {}
     for spec in FRUIT_MENUS:
         parent = menu_by_key.get(spec["parent"]) if spec["parent"] else None
-        item = (
-            db.query(AdminMenu)
-            .filter(
-                AdminMenu.name == spec["name"],
-                AdminMenu.parent_id == (parent.id if parent else None),
-            )
-            .first()
-        )
+        parent_id = parent.id if parent else None
+        item = _find_seed_menu(db, spec, parent_id)
         if item is None:
             item = AdminMenu(
-                parent_id=parent.id if parent else None,
+                parent_id=parent_id,
                 name=spec["name"],
                 menu_type=spec["menu_type"],
                 route_path=spec["route_path"],
@@ -368,14 +377,6 @@ def _seed_menus(db: Session) -> dict[str, AdminMenu]:
             )
             db.add(item)
             db.flush()
-        else:
-            item.menu_type = spec["menu_type"]
-            item.route_path = spec["route_path"]
-            item.component = spec["component"]
-            item.icon = spec["icon"]
-            item.permission_code = spec["permission_code"]
-            item.sort_order = spec["sort_order"]
-            item.is_active = True
         menu_by_key[spec["key"]] = item
     return menu_by_key
 
@@ -396,60 +397,21 @@ def _seed_roles(
             )
             db.add(role)
             db.flush()
-        else:
+            for permission_code in spec["permissions"]:
+                permission = permission_by_code.get(permission_code)
+                if permission is not None:
+                    db.add(
+                        AdminRolePermission(
+                            role_id=role.id,
+                            permission_id=permission.id,
+                        )
+                    )
+            for menu_key in spec["menus"]:
+                menu = menu_by_key.get(menu_key)
+                if menu is not None:
+                    db.add(AdminRoleMenu(role_id=role.id, menu_id=menu.id))
+        elif role.is_system and role.name != spec["name"]:
             role.name = spec["name"]
-            role.description = spec["description"]
-            role.is_system = spec["is_system"]
-            role.is_active = True
-
-        db.query(AdminRolePermission).filter(
-            AdminRolePermission.role_id == role.id
-        ).delete()
-        db.query(AdminRoleMenu).filter(AdminRoleMenu.role_id == role.id).delete()
-        db.flush()
-
-        for permission_code in spec["permissions"]:
-            permission = permission_by_code.get(permission_code)
-            if permission is not None:
-                db.add(AdminRolePermission(role_id=role.id, permission_id=permission.id))
-        for menu_key in spec["menus"]:
-            menu = menu_by_key.get(menu_key)
-            if menu is not None:
-                db.add(AdminRoleMenu(role_id=role.id, menu_id=menu.id))
-
-
-def _assign_user_role(db: Session, username: str, role_code: str) -> None:
-    user = db.query(User).filter(User.display_name == username).first()
-    role = db.query(AdminRole).filter(AdminRole.code == role_code).first()
-    if user is None or role is None:
-        return
-    exists = (
-        db.query(AdminUserRole)
-        .filter(
-            AdminUserRole.user_id == user.id,
-            AdminUserRole.role_id == role.id,
-        )
-        .first()
-    )
-    if exists is None:
-        db.add(AdminUserRole(user_id=user.id, role_id=role.id))
-
-
-def _seed_admin_access(db: Session, username: str) -> None:
-    user = db.query(User).filter(User.display_name == username).first()
-    if user is None:
-        return
-    access = (
-        db.query(AdminAccess)
-        .filter(AdminAccess.user_id == user.id)
-        .first()
-    )
-    if access is None:
-        access = AdminAccess(user_id=user.id, is_active=True, is_super_admin=True)
-        db.add(access)
-    else:
-        access.is_active = True
-        access.is_super_admin = True
 
 
 def _seed_entry_field_options(db: Session) -> None:
@@ -473,9 +435,6 @@ def _seed_entry_field_options(db: Session) -> None:
                     is_active=True,
                 )
             )
-        else:
-            option.sort_order = order
-            option.is_active = True
 
 
 def _seed_field_conversion_rules(db: Session) -> None:
@@ -500,8 +459,3 @@ def _seed_field_conversion_rules(db: Session) -> None:
                 description="BC 界面显示原文，统计统一归入 C",
             )
         )
-    else:
-        rule.target_value = "C"
-        rule.sort_order = 0
-        rule.is_active = True
-        rule.description = "BC 界面显示原文，统计统一归入 C"

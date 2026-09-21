@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import ArrowUp from '@lucide/vue/dist/esm/icons/arrow-up.mjs'
 import ArrowLeftRight from '@lucide/vue/dist/esm/icons/arrow-left-right.mjs'
@@ -8,6 +8,8 @@ import BookOpen from '@lucide/vue/dist/esm/icons/book-open.mjs'
 import ClipboardPen from '@lucide/vue/dist/esm/icons/clipboard-pen.mjs'
 import Clock3 from '@lucide/vue/dist/esm/icons/clock-3.mjs'
 import Database from '@lucide/vue/dist/esm/icons/database.mjs'
+import Eye from '@lucide/vue/dist/esm/icons/eye.mjs'
+import EyeOff from '@lucide/vue/dist/esm/icons/eye-off.mjs'
 import FolderTree from '@lucide/vue/dist/esm/icons/folder-tree.mjs'
 import KeyRound from '@lucide/vue/dist/esm/icons/key-round.mjs'
 import LayoutDashboard from '@lucide/vue/dist/esm/icons/layout-dashboard.mjs'
@@ -24,6 +26,8 @@ import SquareX from '@lucide/vue/dist/esm/icons/square-x.mjs'
 import Users from '@lucide/vue/dist/esm/icons/users.mjs'
 import X from '@lucide/vue/dist/esm/icons/x.mjs'
 import { currentUser, logout } from '../auth'
+import { post } from '../api/client'
+import { notify } from '../feedback'
 import BrandMark from './BrandMark.vue'
 
 const router = useRouter()
@@ -36,25 +40,70 @@ const contextMenu = ref<{ x: number; y: number; path: string } | null>(null)
 const backToTopThreshold = 240
 let clockTimer: number | undefined
 
+const showPasswordModal = ref(false)
+const passwordSaving = ref(false)
+const oldPasswordVisible = ref(false)
+const newPasswordVisible = ref(false)
+const confirmationVisible = ref(false)
+const passwordForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmation: '',
+})
+
+function openChangePassword() {
+  passwordForm.oldPassword = ''
+  passwordForm.newPassword = ''
+  passwordForm.confirmation = ''
+  showPasswordModal.value = true
+}
+
+async function submitChangePassword() {
+  if (!passwordForm.oldPassword || !passwordForm.newPassword || !passwordForm.confirmation) {
+    notify('请完整填写旧密码和新密码', 'error')
+    return
+  }
+  if (passwordForm.newPassword.length < 8) {
+    notify('新密码至少需要 8 位', 'error')
+    return
+  }
+  if (passwordForm.newPassword !== passwordForm.confirmation) {
+    notify('两次输入的新密码不一致', 'error')
+    return
+  }
+  passwordSaving.value = true
+  try {
+    await post('/api/admin/auth/change-password', {
+      old_password: passwordForm.oldPassword,
+      new_password: passwordForm.newPassword,
+      confirmation: passwordForm.confirmation,
+    })
+    notify('密码已修改')
+    showPasswordModal.value = false
+  } catch (err) {
+    notify(err instanceof Error ? err.message : '修改密码失败', 'error')
+  } finally {
+    passwordSaving.value = false
+  }
+}
+
 const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
 
 function pad(value: number) {
   return String(value).padStart(2, '0')
 }
 
-const canManageEntryFields = computed(() => currentUser.value?.roles.some((role) => role.code === 'fruit_admin') === true)
 const adminNav = computed(() => [
   { path: '/admin/dashboard', label: '工作台', icon: LayoutDashboard },
   { path: '/admin/users', label: '用户管理', icon: Users },
   { path: '/admin/roles', label: '角色管理', icon: ShieldCheck },
   { path: '/admin/menus', label: '菜单管理', icon: FolderTree },
   { path: '/admin/notifications', label: '通知管理', icon: Bell },
-  { path: '/admin/permissions', label: '权限管理', icon: KeyRound },
   { path: '/admin/data', label: '业务数据', icon: Database },
   { path: '/admin/logs', label: '审计日志', icon: ScrollText },
   { path: '/admin/settings', label: '系统配置', icon: Settings },
-  ...(canManageEntryFields.value ? [{ path: '/admin/entry-fields', label: '录单字段配置', icon: ClipboardPen }] : []),
-  ...(canManageEntryFields.value ? [{ path: '/admin/field-conversions', label: '字段转换配置', icon: ArrowLeftRight }] : []),
+  { path: '/admin/entry-fields', label: '录单字段配置', icon: ClipboardPen },
+  { path: '/admin/field-conversions', label: '字段转换配置', icon: ArrowLeftRight },
 ])
 const pinnedTab = { path: '/admin/dashboard', title: '工作台' }
 const openTabs = ref<Array<{ path: string; title: string }>>([{ ...pinnedTab }])
@@ -221,6 +270,10 @@ async function handleLogout() {
         <div class="app-header-account">
           <span class="account-avatar">{{ userInitial }}</span>
           <span class="account-name">{{ currentUser?.display_name }}</span>
+          <button class="sign-out-button" @click="openChangePassword">
+            <KeyRound :size="16" :stroke-width="2" aria-hidden="true" />
+            修改密码
+          </button>
           <button class="sign-out-button" @click="handleLogout">
             <LogOut :size="16" :stroke-width="2" aria-hidden="true" />
             退出登录
@@ -309,4 +362,83 @@ async function handleLogout() {
       </div>
     </div>
   </div>
+
+  <div v-if="showPasswordModal" class="drawer-mask" @click.self="showPasswordModal = false">
+    <div class="drawer" role="dialog" aria-modal="true" aria-label="修改密码">
+      <div class="drawer-header">
+        <div class="drawer-title">修改管理端密码</div>
+        <button class="link-button" @click="showPasswordModal = false">关闭</button>
+      </div>
+      <div class="drawer-body">
+        <div class="field">
+          <label>旧密码</label>
+          <div class="password-input">
+            <input v-model="passwordForm.oldPassword" :type="oldPasswordVisible ? 'text' : 'password'" class="input" autocomplete="current-password" />
+            <button type="button" class="password-toggle-button" :aria-label="oldPasswordVisible ? '隐藏旧密码' : '显示旧密码'" @click="oldPasswordVisible = !oldPasswordVisible">
+              <EyeOff v-if="oldPasswordVisible" :size="17" :stroke-width="2" aria-hidden="true" />
+              <Eye v-else :size="17" :stroke-width="2" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label>新密码</label>
+          <div class="password-input">
+            <input v-model="passwordForm.newPassword" :type="newPasswordVisible ? 'text' : 'password'" class="input" autocomplete="new-password" minlength="8" />
+            <button type="button" class="password-toggle-button" :aria-label="newPasswordVisible ? '隐藏新密码' : '显示新密码'" @click="newPasswordVisible = !newPasswordVisible">
+              <EyeOff v-if="newPasswordVisible" :size="17" :stroke-width="2" aria-hidden="true" />
+              <Eye v-else :size="17" :stroke-width="2" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label>再次输入新密码</label>
+          <div class="password-input">
+            <input v-model="passwordForm.confirmation" :type="confirmationVisible ? 'text' : 'password'" class="input" autocomplete="new-password" minlength="8" />
+            <button type="button" class="password-toggle-button" :aria-label="confirmationVisible ? '隐藏确认密码' : '显示确认密码'" @click="confirmationVisible = !confirmationVisible">
+              <EyeOff v-if="confirmationVisible" :size="17" :stroke-width="2" aria-hidden="true" />
+              <Eye v-else :size="17" :stroke-width="2" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="drawer-actions">
+        <button class="secondary-button" @click="showPasswordModal = false">取消</button>
+        <button class="primary-button" :disabled="passwordSaving" @click="submitChangePassword">
+          {{ passwordSaving ? '提交中...' : '确认修改' }}
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
+
+<style scoped>
+.password-input {
+  position: relative;
+}
+
+.password-input .input {
+  padding-right: 2.7rem;
+}
+
+.password-toggle-button {
+  position: absolute;
+  top: 50%;
+  right: .65rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.password-toggle-button:hover {
+  background: var(--surface-hover, #f4f4f5);
+  color: var(--ink);
+}
+</style>

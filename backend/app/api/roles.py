@@ -7,7 +7,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from ..auth import record_operation_log, require_permission
+from ..auth import record_operation_log, require_admin_user
 from ..db import get_db
 from ..models import (
     AdminMenu,
@@ -18,8 +18,8 @@ from ..models import (
     AdminUserRole,
     User,
 )
-from ..schemas import RoleCreate, RoleGrant, RoleListResponse, RoleUpdate
-from ..serializers import role_read
+from ..schemas import RoleCreate, RoleGrant, RoleListResponse, RoleUpdate, UserListResponse
+from ..serializers import role_read, role_reads, user_reads
 
 
 router = APIRouter(prefix="/api/admin/roles", tags=["admin-roles"])
@@ -35,10 +35,10 @@ def _require_role(db: Session, role_id: int) -> AdminRole:
 @router.get("", response_model=RoleListResponse)
 def list_roles(
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:role:view")),
+    _: User = Depends(require_admin_user),
 ):
     roles = db.query(AdminRole).order_by(AdminRole.id).all()
-    return {"items": [role_read(db, role) for role in roles], "total": len(roles)}
+    return {"items": role_reads(db, roles), "total": len(roles)}
 
 
 @router.post("", status_code=201)
@@ -46,7 +46,7 @@ def create_role(
     payload: RoleCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:role:create")),
+    current_user: User = Depends(require_admin_user),
 ):
     exists = db.query(AdminRole).filter(AdminRole.code == payload.code).first()
     if exists is not None:
@@ -79,9 +79,33 @@ def create_role(
 def get_role(
     role_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:role:view")),
+    _: User = Depends(require_admin_user),
 ):
     return role_read(db, _require_role(db, role_id))
+
+
+@router.get("/{role_id}/users", response_model=UserListResponse)
+def list_role_users(
+    role_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_user),
+):
+    role = _require_role(db, role_id)
+    user_ids = [
+        row[0]
+        for row in db.query(AdminUserRole.user_id)
+        .filter(AdminUserRole.role_id == role.id)
+        .all()
+    ]
+    users = (
+        db.query(User)
+        .filter(User.id.in_(user_ids))
+        .order_by(User.id.desc())
+        .all()
+        if user_ids
+        else []
+    )
+    return {"items": user_reads(db, users), "total": len(users)}
 
 
 @router.patch("/{role_id}")
@@ -90,7 +114,7 @@ def update_role(
     payload: RoleUpdate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:role:update")),
+    current_user: User = Depends(require_admin_user),
 ):
     role = _require_role(db, role_id)
     before = json.dumps(role_read(db, role), ensure_ascii=False, default=str)
@@ -124,16 +148,20 @@ def grant_role(
     payload: RoleGrant,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:role:grant")),
+    current_user: User = Depends(require_admin_user),
 ):
     role = _require_role(db, role_id)
     if role.code in {"super_admin", "fruit_admin"}:
         raise HTTPException(status_code=400, detail="系统管理员角色始终拥有全部权限，无需调整")
 
     menus = db.query(AdminMenu).filter(AdminMenu.id.in_(payload.menu_ids)).all()
+    # 角色授权只接受用户端业务权限。
     permissions = (
         db.query(AdminPermission)
-        .filter(AdminPermission.id.in_(payload.permission_ids))
+        .filter(
+            AdminPermission.id.in_(payload.permission_ids),
+            AdminPermission.module != "admin",
+        )
         .all()
     )
     if len(menus) != len(set(payload.menu_ids)) or len(permissions) != len(
@@ -170,7 +198,7 @@ def delete_role(
     role_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("admin:role:delete")),
+    current_user: User = Depends(require_admin_user),
 ):
     role = _require_role(db, role_id)
     if role.is_system or role.code in {"super_admin", "fruit_admin"}:

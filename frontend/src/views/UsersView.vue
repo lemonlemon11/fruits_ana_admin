@@ -37,6 +37,7 @@ const busyUserId = ref<number | null>(null)
 const columns: DataTableColumn<UserItem>[] = [
   { key: 'id', label: 'ID', numeric: true },
   { key: 'display_name', label: '用户名', emphasis: true, rowHeader: true },
+  { key: 'email', label: '邮箱', value: (user) => user.email || '—' },
   { key: 'roles', label: '角色' },
   { key: 'is_active', label: '状态' },
   { key: 'last_login_at', label: '最后登录', value: (user) => (user.last_login_at ? new Date(user.last_login_at).toLocaleString() : '—') },
@@ -233,7 +234,7 @@ onMounted(async () => {
       :rows="items"
       :row-key="(user) => user.id"
       caption="管理端用户列表"
-      min-width="720px"
+      min-width="880px"
       :empty-text="loading ? '正在加载…' : '暂无用户'"
     >
       <template #cell-roles="{ row }">

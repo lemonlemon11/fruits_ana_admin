@@ -9,9 +9,9 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from ..auth import require_permission
+from ..auth import require_admin_user
 from ..db import get_db
-from ..models import AdminLoginLog, AdminOperationLog, User
+from ..models import AdminLoginLog, AdminOperationLog, User, as_beijing_str
 
 
 router = APIRouter(prefix="/api/admin/logs", tags=["admin-logs"])
@@ -25,7 +25,7 @@ def _login_log_dict(item: AdminLoginLog) -> dict:
         "message": item.message,
         "ip": item.ip,
         "user_agent": item.user_agent,
-        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "created_at": as_beijing_str(item.created_at),
     }
 
 
@@ -41,7 +41,7 @@ def _operation_log_dict(item: AdminOperationLog) -> dict:
         "status": item.status,
         "ip": item.ip,
         "user_agent": item.user_agent,
-        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "created_at": as_beijing_str(item.created_at),
     }
 
 
@@ -52,7 +52,7 @@ def list_login_logs(
     username: str | None = None,
     success: bool | None = None,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:log:view")),
+    _: User = Depends(require_admin_user),
 ):
     query = db.query(AdminLoginLog)
     if username:
@@ -76,7 +76,7 @@ def list_operation_logs(
     module: str | None = None,
     username: str | None = None,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:log:view")),
+    _: User = Depends(require_admin_user),
 ):
     query = db.query(AdminOperationLog)
     if module:
@@ -96,7 +96,7 @@ def list_operation_logs(
 @router.get("/operations.csv")
 def export_operation_logs(
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:log:export")),
+    _: User = Depends(require_admin_user),
 ):
     items = db.query(AdminOperationLog).order_by(AdminOperationLog.created_at.desc()).all()
     output = io.StringIO()
@@ -116,7 +116,7 @@ def export_operation_logs(
                 item.summary,
                 item.status,
                 item.ip,
-                item.created_at.isoformat() if item.created_at else "",
+                as_beijing_str(item.created_at) or "",
             ]
         )
     payload = io.BytesIO(output.getvalue().encode("utf-8-sig"))
@@ -130,7 +130,7 @@ def export_operation_logs(
 @router.get("/login.csv")
 def export_login_logs(
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("admin:log:export")),
+    _: User = Depends(require_admin_user),
 ):
     items = db.query(AdminLoginLog).order_by(AdminLoginLog.created_at.desc()).all()
     output = io.StringIO()
@@ -144,7 +144,7 @@ def export_login_logs(
                 item.success,
                 item.message,
                 item.ip,
-                item.created_at.isoformat() if item.created_at else "",
+                as_beijing_str(item.created_at) or "",
             ]
         )
     payload = io.BytesIO(output.getvalue().encode("utf-8-sig"))
