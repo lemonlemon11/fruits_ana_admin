@@ -160,7 +160,6 @@ FRUIT_ROLES: list[dict] = [
         "description": "查看分析、处理导入并导出业务数据",
         "is_system": True,
         "permissions": [
-            "overview:view",
             "settlement:list",
             "settlement:detail",
             "settlement:comparison",
@@ -177,7 +176,6 @@ FRUIT_ROLES: list[dict] = [
         ],
         "menus": [
             "sales-analysis",
-            "overview",
             "settlements",
             "imports",
             "settlement-analysis",
@@ -192,7 +190,6 @@ FRUIT_ROLES: list[dict] = [
         "description": "只读查看 fruits_ana 分析与结算页面",
         "is_system": True,
         "permissions": [
-            "overview:view",
             "settlement:list",
             "settlement:detail",
             "settlement:comparison",
@@ -201,7 +198,6 @@ FRUIT_ROLES: list[dict] = [
         ],
         "menus": [
             "sales-analysis",
-            "overview",
             "settlements",
             "imports",
             "settlement-analysis",
